@@ -46,32 +46,56 @@ def _short_addr(address: str) -> str:
     return address
 
 
+def buy_value_usd(
+    amount_mon: float, amount_usd: "float | None", mon_usd: float
+) -> float:
+    """USD value of a buy/sell (SPEC-v3 §4).
+
+    ``amount_usd`` when present; otherwise ``amount_mon * mon_usd``; 0.0
+    when there is no price feed (callers fall back to v2 MON behaviour).
+    """
+    if amount_usd is not None and amount_usd > 0:
+        return float(amount_usd)
+    if amount_mon and mon_usd and mon_usd > 0:
+        return float(amount_mon) * float(mon_usd)
+    return 0.0
+
+
 async def send_buy_alert(
     bot,
     chat_id: int,
     settings: GroupSettings,
     buy: BuyEvent,
     curve: CurveInfo | None,
+    mon_usd: float = 0.0,
 ) -> None:
-    """Format and send a buy alert to a chat.
+    """Format and send a buy alert to a chat (SPEC-v3 §4: USDT thresholds).
 
-    - Skips when buy.amount_mon < settings.min_buy_mon
-      (amount_mon == 0.0 means "unknown" -> still sent).
-    - Whale when amount_mon >= settings.whale_mon -> whale_emoji.
-    - Emoji repeat: min(20, max(1, int(amount_mon / emoji_step_mon))).
+    - The min-buy filter, whale threshold and emoji repetition all compare
+      against the buy's USD value (``buy_value_usd``) and the
+      ``settings.*_usdt`` fields.
+    - When the USD value is 0.0 (no price feed) the v2 behaviour applies:
+      the alert is sent anyway, with no whale line and a single emoji.
+    - The spent line shows USDT first (MON in parentheses); MON only when
+      there is no USD value.
+    - ``mon_usd`` is an optional kwarg: v2 callers (no kwarg) keep working.
     - Incubation line only when curve.is_incubating.
     """
     lang = settings.language
+    usd = buy_value_usd(buy.amount_mon, buy.amount_usd, mon_usd)
 
-    # min-buy filter (0.0 == unknown amount -> always alert)
-    if buy.amount_mon != 0.0 and buy.amount_mon < settings.min_buy_mon:
+    # min-buy filter in USDT (usd == 0.0 == no feed -> v2: always alert)
+    if usd > 0.0 and usd < settings.min_buy_usdt:
         return
 
-    is_whale = buy.amount_mon >= settings.whale_mon
+    is_whale = usd > 0.0 and usd >= settings.whale_usdt
     emoji = settings.whale_emoji if is_whale else settings.buy_emoji
 
-    step = settings.emoji_step_mon if settings.emoji_step_mon > 0 else 1.0
-    count = min(20, max(1, int(buy.amount_mon / step)))
+    if usd > 0.0:
+        step = settings.emoji_step_usdt if settings.emoji_step_usdt > 0 else 1.0
+        count = min(20, max(1, int(usd / step)))
+    else:
+        count = 1
     emojis = emoji * count
 
     lines = [
@@ -79,10 +103,12 @@ async def send_buy_alert(
         f"{buy.token_name} (${buy.token_symbol}) {emojis}"
     ]
 
-    spent = f"{_fmt_num(buy.amount_mon)} MON"
-    if buy.amount_usd is not None:
-        spent += f" (${buy.amount_usd:,.2f})"
-    lines.append(f"{t(lang, 'buy.spent')}: {spent}")
+    if usd > 0.0:
+        lines.append(
+            t(lang, "buy.spent", usd=f"{usd:,.2f}", mon=_fmt_num(buy.amount_mon))
+        )
+    else:
+        lines.append(t(lang, "buy.spent_mon", mon=_fmt_num(buy.amount_mon)))
 
     lines.append(
         f"{t(lang, 'buy.received')}: {_fmt_num(buy.amount_token)} {buy.token_symbol}"
@@ -117,22 +143,29 @@ async def send_sell_alert(
     settings: GroupSettings,
     sell: SellEvent,
     curve: CurveInfo | None,
+    mon_usd: float = 0.0,
 ) -> None:
-    """Format and send a sell alert (SPEC-v2 §7).
+    """Format and send a sell alert (SPEC-v2 §7 + SPEC-v3 §4).
 
     Same layout as the buy alert but titled with ``sell.title`` and using
     ``settings.sell_emoji``; ``sell.buyer`` is the seller and
     ``sell.amount_mon`` the MON received. The min-buy threshold is applied
-    the same way (amount_mon == 0.0 unknown -> still sent).
+    in USDT against ``buy_value_usd`` (usd == 0.0 -> v2: still sent, one
+    emoji). The received line shows USDT first (MON in parentheses).
+    ``mon_usd`` is an optional kwarg: v2 callers keep working.
     """
     lang = settings.language
+    usd = buy_value_usd(sell.amount_mon, sell.amount_usd, mon_usd)
 
-    # min threshold filter (0.0 == unknown amount -> always alert)
-    if sell.amount_mon != 0.0 and sell.amount_mon < settings.min_buy_mon:
+    # min threshold filter in USDT (usd == 0.0 == no feed -> always alert)
+    if usd > 0.0 and usd < settings.min_buy_usdt:
         return
 
-    step = settings.emoji_step_mon if settings.emoji_step_mon > 0 else 1.0
-    count = min(20, max(1, int(sell.amount_mon / step)))
+    if usd > 0.0:
+        step = settings.emoji_step_usdt if settings.emoji_step_usdt > 0 else 1.0
+        count = min(20, max(1, int(usd / step)))
+    else:
+        count = 1
     emojis = settings.sell_emoji * count
 
     lines = [
@@ -140,10 +173,12 @@ async def send_sell_alert(
         f"{sell.token_name} (${sell.token_symbol}) {emojis}"
     ]
 
-    received = f"{_fmt_num(sell.amount_mon)} MON"
-    if sell.amount_usd is not None:
-        received += f" (${sell.amount_usd:,.2f})"
-    lines.append(f"{t(lang, 'sell.received')}: {received}")
+    if usd > 0.0:
+        lines.append(
+            t(lang, "sell.spent", usd=f"{usd:,.2f}", mon=_fmt_num(sell.amount_mon))
+        )
+    else:
+        lines.append(t(lang, "sell.spent_mon", mon=_fmt_num(sell.amount_mon)))
 
     lines.append(
         f"{t(lang, 'sell.sold')}: {_fmt_num(sell.amount_token)} {sell.token_symbol}"

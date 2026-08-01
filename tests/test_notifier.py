@@ -1,4 +1,10 @@
-"""Tests for bot.notifier.send_buy_alert (chain/telegram mocked)."""
+"""Tests for bot.notifier.send_buy_alert (chain/telegram mocked).
+
+SPEC-v3 §4 changed thresholds/whale/emoji repetition from MON to USDT
+(settings.*_usdt compared against the buy's USD value), so the tests below
+use the *_usdt fields and USD amounts. Calls without the new ``mon_usd``
+kwarg keep working (retro-compatible signature).
+"""
 
 from unittest.mock import AsyncMock
 
@@ -70,31 +76,34 @@ def sent_text(bot) -> str:
 
 @pytest.mark.asyncio
 async def test_min_buy_filter_skips_small_buys(bot):
-    settings = make_settings(min_buy_mon=10.0)
-    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_mon=5.0), None)
+    """SPEC-v3: the min-buy filter compares the USD value vs min_buy_usdt."""
+    settings = make_settings(min_buy_usdt=100.0)
+    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_usd=50.0), None)
     bot.send_message.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_min_buy_filter_sends_at_threshold(bot):
-    settings = make_settings(min_buy_mon=10.0)
-    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_mon=10.0), None)
+    settings = make_settings(min_buy_usdt=100.0)
+    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_usd=100.0), None)
     bot.send_message.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_unknown_amount_zero_still_sends(bot):
-    """amount_mon == 0.0 means unknown -> alert is still sent."""
-    settings = make_settings(min_buy_mon=10.0)
-    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_mon=0.0), None)
+    """No USD value (amount_usd None, no mon_usd feed) -> v2: still sent."""
+    settings = make_settings(min_buy_usdt=10.0)
+    await notifier.send_buy_alert(
+        bot, 123, settings, make_buy(amount_mon=0.0, amount_usd=None), None
+    )
     bot.send_message.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_whale_emoji_used_above_threshold(bot):
-    settings = make_settings(whale_mon=100.0, buy_emoji="🟢", whale_emoji="🐋")
+    settings = make_settings(whale_usdt=100.0, buy_emoji="🟢", whale_emoji="🐋")
     await notifier.send_buy_alert(
-        bot, 123, settings, make_buy(amount_mon=150.0), None
+        bot, 123, settings, make_buy(amount_usd=150.0), None
     )
     text = sent_text(bot)
     assert "🐋" in text
@@ -103,8 +112,8 @@ async def test_whale_emoji_used_above_threshold(bot):
 
 @pytest.mark.asyncio
 async def test_normal_buy_emoji_below_whale_threshold(bot):
-    settings = make_settings(whale_mon=100.0, buy_emoji="🟢", whale_emoji="🐋")
-    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_mon=50.0), None)
+    settings = make_settings(whale_usdt=100.0, buy_emoji="🟢", whale_emoji="🐋")
+    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_usd=50.0), None)
     text = sent_text(bot)
     assert "🟢" in text
     assert "🐋" not in text
@@ -112,22 +121,22 @@ async def test_normal_buy_emoji_below_whale_threshold(bot):
 
 @pytest.mark.asyncio
 async def test_whale_line_only_for_whales(bot):
-    settings = make_settings(whale_mon=100.0)
-    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_mon=150.0), None)
+    settings = make_settings(whale_usdt=100.0)
+    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_usd=150.0), None)
     whale_text = sent_text(bot)
     assert "buy.whale" not in whale_text  # translated, key must not leak
 
     bot.reset_mock()
-    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_mon=50.0), None)
+    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_usd=50.0), None)
     normal_text = sent_text(bot)
     assert len(normal_text.splitlines()) == len(whale_text.splitlines()) - 1
 
 
 @pytest.mark.asyncio
 async def test_emoji_repeat_count(bot):
-    """1 emoji per emoji_step_mon spent, min 1, capped at 20."""
-    settings = make_settings(buy_emoji="🟢", emoji_step_mon=10.0, whale_mon=1000.0)
-    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_mon=45.0), None)
+    """1 emoji per emoji_step_usdt spent, min 1, capped at 20 (SPEC-v3)."""
+    settings = make_settings(buy_emoji="🟢", emoji_step_usdt=10.0, whale_usdt=10000.0)
+    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_usd=45.0), None)
     text = sent_text(bot)
     first_line = text.splitlines()[0]
     # int(45 / 10) == 4 -> four emojis on each side of the title
@@ -137,16 +146,18 @@ async def test_emoji_repeat_count(bot):
 
 @pytest.mark.asyncio
 async def test_emoji_repeat_minimum_one(bot):
-    settings = make_settings(buy_emoji="🟢", emoji_step_mon=10.0, whale_mon=1000.0)
-    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_mon=0.0), None)
+    settings = make_settings(buy_emoji="🟢", emoji_step_usdt=10.0, whale_usdt=10000.0)
+    await notifier.send_buy_alert(
+        bot, 123, settings, make_buy(amount_mon=0.0, amount_usd=None), None
+    )
     text = sent_text(bot)
     assert text.splitlines()[0].startswith("🟢 ")
 
 
 @pytest.mark.asyncio
 async def test_emoji_repeat_capped_at_20(bot):
-    settings = make_settings(buy_emoji="🟢", emoji_step_mon=10.0, whale_mon=10000.0)
-    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_mon=5000.0), None)
+    settings = make_settings(buy_emoji="🟢", emoji_step_usdt=10.0, whale_usdt=100000.0)
+    await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_usd=5000.0), None)
     text = sent_text(bot)
     first_line = text.splitlines()[0]
     assert first_line.startswith("🟢" * 20 + " ")

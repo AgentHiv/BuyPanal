@@ -1,6 +1,6 @@
 {
   "welcome": "👋 ¡Bienvenido al Monad Buy Bot!\n\nSigue las compras de cualquier token en Monad — tokens listados en DEX y tokens en incubación (curva de vinculación) — y recibe alertas en tiempo real en este grupo.\n\nUsa /help para ver todos los comandos.",
-  "help": "📖 Comandos:\n/start — Mensaje de bienvenida e introducción\n/help — Mostrar esta ayuda\n/addtoken <address> — Seguir las compras de un token en este grupo (admin)\n/removetoken <address> — Dejar de seguir un token (admin)\n/tokens — Listar los tokens seguidos\n/setemoji <emoji> — Emoji personalizado para alertas de compra (admin)\n/setwhaleemoji <emoji> — Emoji personalizado para alertas de ballena (admin)\n/setlanguage <en|es|zh> — Idioma del grupo (admin)\n/setminbuy <MON> — Compra mínima para disparar alertas (admin)\n/setwhale <MON> — Umbral de alerta de ballena en MON (admin)\n/price [address] — Precio del token en MON/USD\n/mcap [address] — Capitalización de mercado del token\n/incubation [address] — Progreso de la curva de vinculación (incubación)\n/stats — Estadísticas de compras de 24h de este grupo\n/leaderboard — Mayores compradores del grupo\n/settings — Mostrar la configuración actual del grupo\n/about — Acerca de este bot",
+  "help": "📖 Comandos:\n/start — Mensaje de bienvenida e introducción\n/help — Mostrar esta ayuda\n/setup — Asistente guiado: sigue un token en 3 toques (admin)\n/addtoken <address> — Seguir las compras de un token en este grupo (admin)\n/removetoken <address> — Dejar de seguir un token (admin)\n/tokens — Listar los tokens seguidos\n/setemoji <emoji> — Emoji personalizado para alertas de compra (admin)\n/setwhaleemoji <emoji> — Emoji personalizado para alertas de ballena (admin)\n/setlanguage <en|es|zh> — Idioma del grupo (admin)\n/setminbuy <USDT> — Compra mínima (USDT) para disparar alertas (admin)\n/setwhale <USDT> — Umbral de alerta de ballena en USDT (admin)\n/price [address] — Precio del token en MON/USD\n/mcap [address] — Capitalización de mercado del token\n/incubation [address] — Progreso de la curva de vinculación (incubación)\n/stats — Estadísticas de compras de 24h de este grupo\n/leaderboard — Mayores compradores del grupo\n/settings — Mostrar la configuración actual del grupo\n/about — Acerca de este bot",
   "token": {
     "added": "✅ Ahora se siguen las compras de {address} en este grupo.",
     "exists": "ℹ️ {address} ya está siendo seguido.",
@@ -11,7 +11,7 @@
   },
   "settings": {
     "updated": "✅ Configuración actualizada.",
-    "show": "⚙️ Configuración del grupo:\nIdioma: {language}\nEmoji de compra: {buy_emoji}\nEmoji de ballena: {whale_emoji}\nCompra mínima: {min_buy_mon} MON\nUmbral de ballena: {whale_mon} MON\nPaso de emoji: {emoji_step_mon} MON"
+    "show": "⚙️ Configuración del grupo:\nIdioma: {language}\nEmoji de compra: {buy_emoji}\nEmoji de ballena: {whale_emoji}\nCompra mínima: {min_buy_usdt} USDT\nUmbral de ballena: {whale_usdt} USDT\nPaso de emoji: {emoji_step_usdt} USDT"
   },
   "language": {
     "set": "🌐 Idioma del grupo cambiado a {language}.",
@@ -21,14 +21,15 @@
     "set": "✅ Emoji de alerta de compra cambiado a {emoji}."
   },
   "minbuy": {
-    "set": "✅ Compra mínima para alertas fijada en {amount} MON."
+    "set": "✅ Compra mínima para alertas fijada en {value} USDT."
   },
   "whale": {
-    "set": "✅ Umbral de alerta de ballena fijado en {amount} MON."
+    "set": "✅ Umbral de alerta de ballena fijado en {value} USDT."
   },
   "buy": {
     "title": "COMPRA",
-    "spent": "💸 Gastado",
+    "spent": "💸 Gastado: {usd} USDT (≈ {mon} MON)",
+    "spent_mon": "💸 Gastado: {mon} MON",
     "received": "📦 Recibido",
     "buyer": "👤 Comprador",
     "price": "💲 Precio",
@@ -66,9 +67,10 @@
     "btn_emoji_buy": "🎨 Emoji de compra: {value}",
     "btn_emoji_whale": "🐋 Emoji de ballena: {value}",
     "btn_emoji_sell": "🔴 Emoji de venta: {value}",
-    "btn_minbuy": "💰 Compra mínima: {value} MON",
-    "btn_whale": "🐳 Umbral de ballena: {value} MON",
-    "btn_emojistep": "🔢 Paso de emoji: {value} MON",
+    "btn_minbuy_usdt": "💰 Compra mínima (USDT): {value}",
+    "btn_whale_usdt": "🐳 Ballena (USDT): {value}",
+    "btn_emojistep_usdt": "🔢 Paso de emoji (USDT): {value}",
+    "btn_setup": "➕ Seguir un token",
     "btn_tokens": "📋 Tokens rastreados",
     "btn_toggle_sells": "🔴 Alertas de venta: {value}",
     "btn_toggle_scanner": "🆕 Alertas de nuevos tokens: {value}",
@@ -81,9 +83,9 @@
     "off": "Desactivado",
     "choose_language": "🌐 Elige un idioma:",
     "choose_emoji": "🎨 Elige un emoji, o toca ✏️ Personalizado para enviar el tuyo:",
-    "choose_amount": "💰 Elige un valor en MON, o toca ✏️ Personalizado:",
+    "choose_amount": "💰 Elige un valor en USDT, o toca ✏️ Personalizado:",
     "custom_prompt_emoji": "✏️ Responde a este mensaje con el emoji que quieras usar (1–4 caracteres emoji).",
-    "custom_prompt_amount": "✏️ Responde a este mensaje con el valor en MON (un número mayor que 0).",
+    "custom_prompt_amount": "✏️ Responde a este mensaje con el valor en USDT (un número mayor que 0).",
     "saved": "✅ Guardado.",
     "invalid_emoji": "⚠️ Eso no parece un emoji. Envía 1–4 caracteres emoji (sin letras ni números).",
     "invalid_number": "⚠️ Envía un número mayor que 0.",
@@ -91,5 +93,21 @@
     "no_tokens": "Aún no hay tokens rastreados. Los admins pueden añadir uno con /addtoken <address>.",
     "start_buttons_help": "Toca ⚙️ Configuración para ajustar las alertas de este grupo con botones, sin comandos.",
     "add_to_group": "➕ Añádeme a tu grupo"
+  },
+  "wizard": {
+    "prompt_token": "➕ Envíame la dirección del token en Monad (0x…)",
+    "card": "🪙 {name} (${symbol})\nTipo: {kind}\nPrecio: {price} MON",
+    "kind_curve": "🧪 Incubación (curva de vinculación)",
+    "kind_dex": "💱 DEX",
+    "btn_track": "✅ Empezar seguimiento",
+    "btn_cancel": "❌ Cancelar",
+    "tracked": "✅ Ahora se sigue {name} (${symbol}) en este grupo. Configuración rápida:",
+    "btn_emoji": "🎨 Emoji",
+    "btn_minbuy": "💰 Compra mínima USDT",
+    "btn_whale": "🐋 Ballena USDT",
+    "btn_language": "🌐 Idioma",
+    "btn_done": "✔️ Listo",
+    "invalid_token": "⚠️ Eso no parece una dirección de token válida. Envía una dirección de Monad (0x seguido de 40 caracteres hexadecimales).",
+    "fetch_failed": "⚠️ No se pudo obtener ese token de la cadena. Revisa la dirección e inténtalo de nuevo."
   }
 }

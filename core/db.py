@@ -76,6 +76,21 @@ _SETTINGS_V2_COLUMNS = (
     ("sell_emoji", "sell_emoji TEXT NOT NULL DEFAULT '🔴'"),
 )
 
+# Columns added in v3 (SPEC-v3 §2): USDT thresholds for group_settings.
+# The legacy *_mon columns stay in the schema untouched.
+_SETTINGS_V3_COLUMNS = (
+    ("min_buy_usdt", "min_buy_usdt REAL NOT NULL DEFAULT 5.0"),
+    ("whale_usdt", "whale_usdt REAL NOT NULL DEFAULT 500.0"),
+    ("emoji_step_usdt", "emoji_step_usdt REAL NOT NULL DEFAULT 25.0"),
+)
+
+# Columns added in v3 to price_alerts: USD-denominated alerts. Existing v2
+# rows get currency='MON' via the column default.
+_ALERTS_V3_COLUMNS = (
+    ("target_usd", "target_usd REAL"),
+    ("currency", "currency TEXT NOT NULL DEFAULT 'MON'"),
+)
+
 
 def _norm(address: str) -> str:
     """Normalize an address for case-insensitive storage/lookup."""
@@ -95,17 +110,22 @@ class Database:
         self._migrate()
 
     def _migrate(self) -> None:
-        """Add v2 columns to a v1 ``group_settings`` table. Never fails."""
+        """Add v2/v3 columns to older tables. Never fails."""
+        self._migrate_table("group_settings", _SETTINGS_V2_COLUMNS + _SETTINGS_V3_COLUMNS)
+        self._migrate_table("price_alerts", _ALERTS_V3_COLUMNS)
+
+    def _migrate_table(self, table: str, columns) -> None:
+        """Guarded ``ALTER TABLE ADD COLUMN`` for any missing columns."""
         try:
-            rows = self._conn.execute("PRAGMA table_info(group_settings)").fetchall()
+            rows = self._conn.execute(f"PRAGMA table_info({table})").fetchall()
             existing = {row["name"] for row in rows}
             with self._conn:
-                for name, ddl in _SETTINGS_V2_COLUMNS:
+                for name, ddl in columns:
                     if name in existing:
                         continue
                     try:
                         self._conn.execute(
-                            f"ALTER TABLE group_settings ADD COLUMN {ddl}"
+                            f"ALTER TABLE {table} ADD COLUMN {ddl}"
                         )
                     except sqlite3.Error:
                         # Another process raced us, etc. — column likely there.
@@ -141,6 +161,11 @@ class Database:
                 bool(row["scanner_alerts"]) if "scanner_alerts" in keys else False
             ),
             sell_emoji=row["sell_emoji"] if "sell_emoji" in keys else "🔴",
+            min_buy_usdt=float(row["min_buy_usdt"]) if "min_buy_usdt" in keys else 5.0,
+            whale_usdt=float(row["whale_usdt"]) if "whale_usdt" in keys else 500.0,
+            emoji_step_usdt=(
+                float(row["emoji_step_usdt"]) if "emoji_step_usdt" in keys else 25.0
+            ),
         )
 
     def save_settings(self, settings: GroupSettings) -> None:
@@ -150,8 +175,9 @@ class Database:
                 INSERT INTO group_settings (
                     chat_id, language, buy_emoji, whale_emoji,
                     min_buy_mon, whale_mon, emoji_step_mon,
-                    sell_alerts, scanner_alerts, sell_emoji
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    sell_alerts, scanner_alerts, sell_emoji,
+                    min_buy_usdt, whale_usdt, emoji_step_usdt
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(chat_id) DO UPDATE SET
                     language       = excluded.language,
                     buy_emoji      = excluded.buy_emoji,
@@ -161,7 +187,10 @@ class Database:
                     emoji_step_mon = excluded.emoji_step_mon,
                     sell_alerts    = excluded.sell_alerts,
                     scanner_alerts = excluded.scanner_alerts,
-                    sell_emoji     = excluded.sell_emoji
+                    sell_emoji     = excluded.sell_emoji,
+                    min_buy_usdt   = excluded.min_buy_usdt,
+                    whale_usdt     = excluded.whale_usdt,
+                    emoji_step_usdt = excluded.emoji_step_usdt
                 """,
                 (
                     settings.chat_id,
@@ -174,6 +203,9 @@ class Database:
                     int(settings.sell_alerts),
                     int(settings.scanner_alerts),
                     settings.sell_emoji,
+                    float(settings.min_buy_usdt),
+                    float(settings.whale_usdt),
+                    float(settings.emoji_step_usdt),
                 ),
             )
 
@@ -285,6 +317,8 @@ class Database:
     # ------------------------------------------------------------------
     @staticmethod
     def _row_to_alert(row: sqlite3.Row) -> PriceAlert:
+        keys = set(row.keys())  # tolerate unmigrated/legacy tables
+        target_usd = row["target_usd"] if "target_usd" in keys else None
         return PriceAlert(
             id=int(row["id"]),
             chat_id=int(row["chat_id"]),
@@ -293,6 +327,8 @@ class Database:
             target_mon=float(row["target_mon"]),
             created_by=int(row["created_by"]),
             active=bool(row["active"]),
+            target_usd=None if target_usd is None else float(target_usd),
+            currency=row["currency"] if "currency" in keys else "MON",
         )
 
     def add_price_alert(
@@ -302,15 +338,21 @@ class Database:
         direction: str,
         target_mon: float,
         created_by: int,
+        target_usd: "float | None" = None,
+        currency: str = "MON",
     ) -> int:
-        """Insert a price alert and return its id."""
+        """Insert a price alert and return its id.
+
+        SPEC-v3: USD alerts pass ``target_usd`` + ``currency="USD"``; v2 MON
+        alerts keep working with the original positional arguments.
+        """
         with self._conn:
             cur = self._conn.execute(
                 """
                 INSERT INTO price_alerts (
                     chat_id, token_address, direction, target_mon,
-                    created_by, active, created_at
-                ) VALUES (?, ?, ?, ?, ?, 1, ?)
+                    created_by, active, created_at, target_usd, currency
+                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
                 """,
                 (
                     chat_id,
@@ -319,6 +361,8 @@ class Database:
                     float(target_mon),
                     int(created_by),
                     int(time.time()),
+                    None if target_usd is None else float(target_usd),
+                    str(currency or "MON"),
                 ),
             )
         return int(cur.lastrowid)

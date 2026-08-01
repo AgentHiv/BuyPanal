@@ -2,15 +2,16 @@
   "sell": {
     "title": "SELL",
     "sold": "📦 Sold",
-    "received": "💸 Received",
+    "spent": "💸 Received: {usd} USDT (≈ {mon} MON)",
+    "spent_mon": "💸 Received: {mon} MON",
     "seller": "👤 Seller"
   },
   "adv": {
-    "pricealert_set": "✅ Price alert #{id} set for {symbol}: notify when the price goes {direction} {target} MON.",
-    "pricealert_triggered": "🔔 Price alert triggered!\n{name} (${symbol}) is now {price} MON (target: {direction} {target} MON).",
+    "pricealert_set": "✅ Price alert #{id} set for {symbol}: notify when the price goes {direction} {target} USDT.",
+    "pricealert_triggered": "🔔 Price alert triggered!\n{symbol} is now {price} (target: {direction} {target}).",
     "alerts_title": "⏰ Active price alerts:",
-    "alerts_empty": "You have no active price alerts. Create one with /pricealert <address> <above|below> <price_MON>.",
-    "alerts_row": "#{id} {symbol} {direction} {target} MON",
+    "alerts_empty": "You have no active price alerts. Create one with /pricealert <address> <above|below> <target_USDT>.",
+    "alerts_row": "#{id} {symbol} {direction} {target}",
     "alert_cancelled": "🗑️ Price alert #{id} cancelled.",
     "scanner_on": "🛰️ New incubation-token launch alerts ENABLED for this group.",
     "scanner_off": "🛰️ New incubation-token launch alerts DISABLED for this group.",

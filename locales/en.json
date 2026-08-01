@@ -1,6 +1,6 @@
 {
   "welcome": "👋 Welcome to the Monad Buy Bot!\n\nTrack buys of any token on Monad — DEX-listed and incubation (bonding-curve) tokens — and get real-time alerts in this group.\n\nUse /help to see all commands.",
-  "help": "📖 Commands:\n/start — Welcome message and bot intro\n/help — Show this help\n/addtoken <address> — Track a token's buys in this group (admin)\n/removetoken <address> — Stop tracking a token (admin)\n/tokens — List tracked tokens\n/setemoji <emoji> — Set custom buy alert emoji (admin)\n/setwhaleemoji <emoji> — Set custom whale alert emoji (admin)\n/setlanguage <en|es|zh> — Set group language (admin)\n/setminbuy <MON> — Minimum buy amount to trigger alerts (admin)\n/setwhale <MON> — Whale alert threshold in MON (admin)\n/price [address] — Token price in MON/USD\n/mcap [address] — Token market cap\n/incubation [address] — Bonding-curve (incubation) progress\n/stats — 24h buy stats for this group\n/leaderboard — Top buyers in this group\n/settings — Show current group settings\n/about — About this bot",
+  "help": "📖 Commands:\n/start — Welcome message and bot intro\n/help — Show this help\n/setup — Guided setup: track a token in 3 taps (admin)\n/addtoken <address> — Track a token's buys in this group (admin)\n/removetoken <address> — Stop tracking a token (admin)\n/tokens — List tracked tokens\n/setemoji <emoji> — Set custom buy alert emoji (admin)\n/setwhaleemoji <emoji> — Set custom whale alert emoji (admin)\n/setlanguage <en|es|zh> — Set group language (admin)\n/setminbuy <USDT> — Minimum buy (USDT) to trigger alerts (admin)\n/setwhale <USDT> — Whale alert threshold in USDT (admin)\n/price [address] — Token price in MON/USD\n/mcap [address] — Token market cap\n/incubation [address] — Bonding-curve (incubation) progress\n/stats — 24h buy stats for this group\n/leaderboard — Top buyers in this group\n/settings — Show current group settings\n/about — About this bot",
   "token": {
     "added": "✅ Now tracking buys for {address} in this group.",
     "exists": "ℹ️ {address} is already being tracked.",
@@ -11,7 +11,7 @@
   },
   "settings": {
     "updated": "✅ Settings updated.",
-    "show": "⚙️ Group settings:\nLanguage: {language}\nBuy emoji: {buy_emoji}\nWhale emoji: {whale_emoji}\nMin buy: {min_buy_mon} MON\nWhale threshold: {whale_mon} MON\nEmoji step: {emoji_step_mon} MON"
+    "show": "⚙️ Group settings:\nLanguage: {language}\nBuy emoji: {buy_emoji}\nWhale emoji: {whale_emoji}\nMin buy: {min_buy_usdt} USDT\nWhale threshold: {whale_usdt} USDT\nEmoji step: {emoji_step_usdt} USDT"
   },
   "language": {
     "set": "🌐 Group language set to {language}.",
@@ -21,14 +21,15 @@
     "set": "✅ Buy alert emoji set to {emoji}."
   },
   "minbuy": {
-    "set": "✅ Minimum buy alert amount set to {amount} MON."
+    "set": "✅ Minimum buy alert amount set to {value} USDT."
   },
   "whale": {
-    "set": "✅ Whale alert threshold set to {amount} MON."
+    "set": "✅ Whale alert threshold set to {value} USDT."
   },
   "buy": {
     "title": "BUY",
-    "spent": "💸 Spent",
+    "spent": "💸 Spent: {usd} USDT (≈ {mon} MON)",
+    "spent_mon": "💸 Spent: {mon} MON",
     "received": "📦 Received",
     "buyer": "👤 Buyer",
     "price": "💲 Price",
@@ -66,9 +67,10 @@
     "btn_emoji_buy": "🎨 Buy emoji: {value}",
     "btn_emoji_whale": "🐋 Whale emoji: {value}",
     "btn_emoji_sell": "🔴 Sell emoji: {value}",
-    "btn_minbuy": "💰 Min buy: {value} MON",
-    "btn_whale": "🐳 Whale threshold: {value} MON",
-    "btn_emojistep": "🔢 Emoji step: {value} MON",
+    "btn_minbuy_usdt": "💰 Min buy (USDT): {value}",
+    "btn_whale_usdt": "🐳 Whale (USDT): {value}",
+    "btn_emojistep_usdt": "🔢 Emoji step (USDT): {value}",
+    "btn_setup": "➕ Track a token",
     "btn_tokens": "📋 Tracked tokens",
     "btn_toggle_sells": "🔴 Sell alerts: {value}",
     "btn_toggle_scanner": "🆕 New-token alerts: {value}",
@@ -81,9 +83,9 @@
     "off": "OFF",
     "choose_language": "🌐 Choose a language:",
     "choose_emoji": "🎨 Choose an emoji, or tap ✏️ Custom to send your own:",
-    "choose_amount": "💰 Choose a value in MON, or tap ✏️ Custom:",
+    "choose_amount": "💰 Choose a value in USDT, or tap ✏️ Custom:",
     "custom_prompt_emoji": "✏️ Reply to this message with the emoji you want to use (1–4 emoji characters).",
-    "custom_prompt_amount": "✏️ Reply to this message with the value in MON (a number greater than 0).",
+    "custom_prompt_amount": "✏️ Reply to this message with the value in USDT (a number greater than 0).",
     "saved": "✅ Saved.",
     "invalid_emoji": "⚠️ That doesn't look like an emoji. Please send 1–4 emoji characters (no letters or numbers).",
     "invalid_number": "⚠️ Please send a number greater than 0.",
@@ -91,5 +93,21 @@
     "no_tokens": "No tokens tracked yet. Admins can add one with /addtoken <address>.",
     "start_buttons_help": "Tap ⚙️ Settings to configure this group's alerts with buttons — no commands needed.",
     "add_to_group": "➕ Add me to your group"
+  },
+  "wizard": {
+    "prompt_token": "➕ Send me the token address on Monad (0x…)",
+    "card": "🪙 {name} (${symbol})\nType: {kind}\nPrice: {price} MON",
+    "kind_curve": "🧪 Incubation (bonding curve)",
+    "kind_dex": "💱 DEX",
+    "btn_track": "✅ Start tracking",
+    "btn_cancel": "❌ Cancel",
+    "tracked": "✅ Now tracking {name} (${symbol}) in this group. Quick config:",
+    "btn_emoji": "🎨 Emoji",
+    "btn_minbuy": "💰 Min buy USDT",
+    "btn_whale": "🐋 Whale USDT",
+    "btn_language": "🌐 Language",
+    "btn_done": "✔️ Done",
+    "invalid_token": "⚠️ That doesn't look like a valid token address. Please send a Monad address (0x followed by 40 hex characters).",
+    "fetch_failed": "⚠️ Couldn't fetch that token from the chain. Check the address and try again."
   }
 }

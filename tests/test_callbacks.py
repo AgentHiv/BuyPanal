@@ -131,9 +131,10 @@ def test_settings_keyboard_has_all_menu_entries():
         "cfg:emoji:buy",
         "cfg:emoji:whale",
         "cfg:emoji:sell",
-        "cfg:amount:min_buy_mon",
-        "cfg:amount:whale_mon",
-        "cfg:amount:emoji_step_mon",
+        # SPEC-v3 §5.2: amount rows edit the USDT threshold fields
+        "cfg:amount:min_buy_usdt",
+        "cfg:amount:whale_usdt",
+        "cfg:amount:emoji_step_usdt",
         "cfg:tokens",
         "cfg:toggle:sell_alerts",
         "cfg:toggle:scanner_alerts",
@@ -169,11 +170,12 @@ def test_emoji_preset_keyboard_has_10_plus_presets_and_custom():
 
 
 def test_amount_keyboard_presets_and_custom():
-    markup = keyboards.build_amount_keyboard("min_buy_mon")
+    # SPEC-v3 §5.2: presets are USDT amounts
+    markup = keyboards.build_amount_keyboard("min_buy_usdt")
     data = callback_datas(markup)
-    for n in ("1", "5", "10", "50", "100"):
-        assert f"cfg:amount:min_buy_mon:set:{n}" in data
-    assert "cfg:amount:min_buy_mon:custom" in data
+    for n in ("5", "25", "100", "500", "1000"):
+        assert f"cfg:amount:min_buy_usdt:set:{n}" in data
+    assert "cfg:amount:min_buy_usdt:custom" in data
     assert "cfg:back" in data
 
 
@@ -273,16 +275,16 @@ async def test_emoji_preset_set(deps, db):
 
 @pytest.mark.asyncio
 async def test_amount_preset_set(deps, db):
-    update = make_callback_update("cfg:amount:whale_mon:set:50")
+    update = make_callback_update("cfg:amount:whale_usdt:set:500")
     await callbacks.on_cfg_callback(update, make_context(), deps)
-    assert db.get_settings(100).whale_mon == 50.0
+    assert db.get_settings(100).whale_usdt == 500.0
 
 
 @pytest.mark.asyncio
 async def test_amount_preset_rejects_non_positive(deps, db):
-    update = make_callback_update("cfg:amount:min_buy_mon:set:0")
+    update = make_callback_update("cfg:amount:min_buy_usdt:set:0")
     await callbacks.on_cfg_callback(update, make_context(), deps)
-    assert db.get_settings(100).min_buy_mon == 1.0  # unchanged default
+    assert db.get_settings(100).min_buy_usdt == 5.0  # unchanged default
     update.callback_query.answer.assert_awaited_once()
 
 
@@ -388,18 +390,18 @@ async def test_guided_input_rejects_invalid_emoji(deps, db):
 async def test_guided_input_amount_validation(deps, db):
     context = make_context()
     await callbacks.on_cfg_callback(
-        make_callback_update("cfg:amount:emoji_step_mon:custom"), context, deps
+        make_callback_update("cfg:amount:emoji_step_usdt:custom"), context, deps
     )
-    assert context.chat_data["awaiting"] == "emoji_step_mon"
+    assert context.chat_data["awaiting"] == "emoji_step_usdt"
 
     bad = make_text_update("-3")
     await callbacks.on_guided_text(bad, context, deps)
-    assert db.get_settings(100).emoji_step_mon == 10.0  # unchanged
+    assert db.get_settings(100).emoji_step_usdt == 25.0  # unchanged
     assert "awaiting" in context.chat_data
 
     good = make_text_update("2.5")
     await callbacks.on_guided_text(good, context, deps)
-    assert db.get_settings(100).emoji_step_mon == 2.5
+    assert db.get_settings(100).emoji_step_usdt == 2.5
     assert "awaiting" not in context.chat_data
 
 
@@ -428,7 +430,7 @@ async def test_guided_input_noop_without_awaiting(deps):
 async def test_guided_input_non_admin_rejected(deps, db):
     context = make_context()
     await callbacks.on_cfg_callback(
-        make_callback_update("cfg:amount:min_buy_mon:custom"), context, deps
+        make_callback_update("cfg:amount:min_buy_usdt:custom"), context, deps
     )
     # user loses admin rights before answering
     context.bot.get_chat_member = AsyncMock(
@@ -436,4 +438,4 @@ async def test_guided_input_non_admin_rejected(deps, db):
     )
     update = make_text_update("5")
     await callbacks.on_guided_text(update, context, deps)
-    assert db.get_settings(100).min_buy_mon == 1.0  # unchanged
+    assert db.get_settings(100).min_buy_usdt == 5.0  # unchanged

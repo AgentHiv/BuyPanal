@@ -67,6 +67,8 @@ class PriceAlert:
     target_mon: float
     created_by: int         # telegram user id
     active: bool = True
+    target_usd: Optional[float] = None   # SPEC-v3: set when the alert is in USDT
+    currency: str = "MON"                # SPEC-v3: "MON" (v2 alerts) | "USD" (new)
 
 
 @dataclass
@@ -92,6 +94,11 @@ class GroupSettings:
     sell_alerts: bool = False   # SPEC-v2: alert sells too
     scanner_alerts: bool = False  # SPEC-v2: alert new incubation tokens
     sell_emoji: str = "🔴"      # SPEC-v2
+    # SPEC-v3: USDT thresholds. The *_mon fields above stay in the schema for
+    # backwards compatibility, but the UI and the notifier use ONLY these.
+    min_buy_usdt: float = 5.0       # min buy alert threshold in USDT
+    whale_usdt: float = 500.0       # whale alert threshold in USDT
+    emoji_step_usdt: float = 25.0   # 1 emoji repeated per this many USDT
 
 
 @dataclass

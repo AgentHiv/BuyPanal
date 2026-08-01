@@ -36,8 +36,9 @@ COMMANDS = [
     ("setemoji", "Set custom buy alert emoji", True),
     ("setwhaleemoji", "Set custom whale alert emoji", True),
     ("setlanguage", "Set group language (en|es|zh)", True),
-    ("setminbuy", "Minimum buy amount to trigger alerts", True),
-    ("setwhale", "Whale alert threshold in MON", True),
+    ("setup", "Guided setup: track a token in 3 taps", True),
+    ("setminbuy", "Minimum buy (USDT) to trigger alerts", True),
+    ("setwhale", "Whale alert threshold in USDT", True),
     ("price", "Token price in MON/USD", False),
     ("mcap", "Token market cap", False),
     ("incubation", "Bonding-curve (incubation) progress", False),
@@ -286,12 +287,31 @@ async def _set_float(
 
 @admin_only
 async def cmd_setminbuy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await _set_float(update, context, "min_buy_mon", "minbuy.set")
+    # SPEC-v3: thresholds are configured in USDT
+    await _set_float(update, context, "min_buy_usdt", "minbuy.set")
 
 
 @admin_only
 async def cmd_setwhale(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await _set_float(update, context, "whale_mon", "whale.set")
+    await _set_float(update, context, "whale_usdt", "whale.set")
+
+
+@admin_only
+async def cmd_setup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Guided token-setup wizard (SPEC-v3 §5.1): ForceReply for the address.
+
+    The actual flow (card -> track -> quick-config) lives in bot/callbacks.py;
+    here we only arm the ``awaiting`` state and send the ForceReply prompt.
+    """
+    lang = _lang(update, context)
+    user_id = update.effective_user.id if update.effective_user else 0
+    try:
+        from bot import callbacks as ui_callbacks
+
+        await ui_callbacks.prompt_wizard_token(update.message, context, user_id, lang)
+    except ImportError:  # pragma: no cover - callbacks module is shipped together
+        logger.warning("bot.callbacks unavailable; /setup wizard disabled")
+        await update.message.reply_text(t(lang, "error.generic"))
 
 
 async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -430,6 +450,7 @@ HANDLERS = {
     "setemoji": cmd_setemoji,
     "setwhaleemoji": cmd_setwhaleemoji,
     "setlanguage": cmd_setlanguage,
+    "setup": cmd_setup,
     "setminbuy": cmd_setminbuy,
     "setwhale": cmd_setwhale,
     "price": cmd_price,

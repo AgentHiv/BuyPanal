@@ -18,7 +18,7 @@ TOKEN_B = "0x" + "bb" * 20
 
 
 def make_alert(alert_id=1, chat_id=CHAT, token=TOKEN, direction="above",
-               target=1.0, active=True) -> PriceAlert:
+               target=1.0, active=True, target_usd=None, currency="MON") -> PriceAlert:
     return PriceAlert(
         id=alert_id,
         chat_id=chat_id,
@@ -27,6 +27,8 @@ def make_alert(alert_id=1, chat_id=CHAT, token=TOKEN, direction="above",
         target_mon=target,
         created_by=42,
         active=active,
+        target_usd=target_usd,
+        currency=currency,
     )
 
 
@@ -209,3 +211,61 @@ async def test_start_stop_loop(monkeypatch, fired):
     await monitor.stop()
     await asyncio.wait_for(task, timeout=2.0)
     assert len(fired) == 1  # fired exactly once despite several iterations
+
+
+# ------------------------------------------------------------------ SPEC-v3 USD
+@pytest.mark.asyncio
+async def test_usd_alert_triggers_on_usd_value(monkeypatch, monitor, fired):
+    """currency='USD': compares price_mon * mon_usd against target_usd."""
+    monitor.set_price_provider(lambda: 0.02)  # 1 MON = $0.02
+    monitor.set_alert_provider(
+        lambda: [make_alert(direction="above", target=0.0, target_usd=2.0, currency="USD")]
+    )
+    patch_price(monkeypatch, {TOKEN: 150.0})  # 150 MON * 0.02 = $3.00 >= $2
+    await monitor._check_once()
+    assert len(fired) == 1
+    alert, price = fired[0]
+    assert alert.currency == "USD"
+    assert price == pytest.approx(150.0)  # on_alert still receives price in MON
+
+
+@pytest.mark.asyncio
+async def test_usd_alert_does_not_trigger_below_usd_target(monkeypatch, monitor, fired):
+    monitor.set_price_provider(lambda: 0.02)
+    monitor.set_alert_provider(
+        lambda: [make_alert(direction="above", target=0.0, target_usd=5.0, currency="USD")]
+    )
+    patch_price(monkeypatch, {TOKEN: 150.0})  # $3.00 < $5
+    await monitor._check_once()
+    assert fired == []
+
+
+@pytest.mark.asyncio
+async def test_usd_alert_never_fires_without_price_feed(monkeypatch, monitor, fired):
+    """No set_price_provider -> mon_usd 0.0 -> USD alerts stay silent."""
+    monitor.set_alert_provider(
+        lambda: [make_alert(direction="below", target=0.0, target_usd=999.0, currency="USD")]
+    )
+    patch_price(monkeypatch, {TOKEN: 150.0})
+    await monitor._check_once()
+    assert fired == []
+
+
+@pytest.mark.asyncio
+async def test_mixed_mon_and_usd_alerts(monkeypatch, monitor, fired):
+    """MON alerts keep v2 semantics while USD alerts use the price feed."""
+    monitor.set_price_provider(lambda: 0.02)
+    alerts = [
+        # MON alert: above 100 MON (price 150 MON -> fires)
+        make_alert(alert_id=1, direction="above", target=100.0),
+        # USD alert: above $10 (150 * 0.02 = $3 -> no)
+        make_alert(alert_id=2, direction="above", target=0.0, target_usd=10.0, currency="USD"),
+        # USD alert: below $5 ($3 -> fires)
+        make_alert(alert_id=3, direction="below", target=0.0, target_usd=5.0, currency="USD"),
+        # MON alert: below 100 MON (150 -> no)
+        make_alert(alert_id=4, direction="below", target=100.0),
+    ]
+    monitor.set_alert_provider(lambda: alerts)
+    patch_price(monkeypatch, {TOKEN: 150.0})
+    await monitor._check_once()
+    assert {a.id for a, _ in fired} == {1, 3}

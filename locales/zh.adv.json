@@ -2,15 +2,16 @@
   "sell": {
     "title": "卖出",
     "sold": "📦 卖出数量",
-    "received": "💸 收到",
+    "spent": "💸 收到：{usd} USDT（≈ {mon} MON）",
+    "spent_mon": "💸 收到：{mon} MON",
     "seller": "👤 卖家"
   },
   "adv": {
-    "pricealert_set": "✅ 已为 {symbol} 设置价格提醒 #{id}：当价格{direction} {target} MON 时通知。",
-    "pricealert_triggered": "🔔 价格提醒触发！\n{name} (${symbol}) 当前价格为 {price} MON（目标：{direction} {target} MON）。",
+    "pricealert_set": "✅ 已为 {symbol} 设置价格提醒 #{id}：当价格{direction} {target} USDT 时通知。",
+    "pricealert_triggered": "🔔 价格提醒触发！\n{symbol} 当前价格为 {price}（目标：{direction} {target}）。",
     "alerts_title": "⏰ 当前价格提醒：",
-    "alerts_empty": "暂无价格提醒。使用 /pricealert <address> <above|below> <价格_MON> 创建一个。",
-    "alerts_row": "#{id} {symbol} {direction} {target} MON",
+    "alerts_empty": "暂无价格提醒。使用 /pricealert <address> <above|below> <目标_USDT> 创建一个。",
+    "alerts_row": "#{id} {symbol} {direction} {target}",
     "alert_cancelled": "🗑️ 价格提醒 #{id} 已取消。",
     "scanner_on": "🛰️ 已为本群开启孵化新代币上线提醒。",
     "scanner_off": "🛰️ 已为本群关闭孵化新代币上线提醒。",

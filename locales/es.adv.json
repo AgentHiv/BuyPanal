@@ -2,15 +2,16 @@
   "sell": {
     "title": "VENTA",
     "sold": "📦 Vendido",
-    "received": "💸 Recibido",
+    "spent": "💸 Recibido: {usd} USDT (≈ {mon} MON)",
+    "spent_mon": "💸 Recibido: {mon} MON",
     "seller": "👤 Vendedor"
   },
   "adv": {
-    "pricealert_set": "✅ Alerta de precio #{id} creada para {symbol}: avisar cuando el precio supere/baje de {target} MON ({direction}).",
-    "pricealert_triggered": "🔔 ¡Alerta de precio disparada!\n{name} (${symbol}) está ahora en {price} MON (objetivo: {direction} {target} MON).",
+    "pricealert_set": "✅ Alerta de precio #{id} creada para {symbol}: avisar cuando el precio supere/baje de {target} USDT ({direction}).",
+    "pricealert_triggered": "🔔 ¡Alerta de precio disparada!\n{symbol} está ahora en {price} (objetivo: {direction} {target}).",
     "alerts_title": "⏰ Alertas de precio activas:",
-    "alerts_empty": "No tienes alertas de precio activas. Crea una con /pricealert <address> <above|below> <precio_MON>.",
-    "alerts_row": "#{id} {symbol} {direction} {target} MON",
+    "alerts_empty": "No tienes alertas de precio activas. Crea una con /pricealert <address> <above|below> <objetivo_USDT>.",
+    "alerts_row": "#{id} {symbol} {direction} {target}",
     "alert_cancelled": "🗑️ Alerta de precio #{id} cancelada.",
     "scanner_on": "🛰️ Alertas de nuevos tokens en incubación ACTIVADAS para este grupo.",
     "scanner_off": "🛰️ Alertas de nuevos tokens en incubación DESACTIVADAS para este grupo.",

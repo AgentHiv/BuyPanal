@@ -30,6 +30,7 @@ class PriceMonitor:
         """on_alert: async callable (alert: PriceAlert, current_price_mon: float)"""
         self._on_alert = on_alert
         self._alert_provider: Optional[Callable[[], list[PriceAlert]]] = None
+        self._price_provider: Optional[Callable[[], float]] = None  # SPEC-v3
         self._running = False
         self._interval: Optional[float] = None  # test/override hook
         self._fired: set = set()  # alert ids (or fallback keys) already fired
@@ -37,6 +38,25 @@ class PriceMonitor:
     def set_alert_provider(self, fn) -> None:
         """fn() -> list[PriceAlert] of active alerts (e.g. from the db)."""
         self._alert_provider = fn
+
+    def set_price_provider(self, fn) -> None:
+        """fn() -> float: current MON price in USD (SPEC-v3 §4).
+
+        Used to evaluate ``currency == "USD"`` alerts. When unset (or the
+        provider returns <= 0) USD alerts simply do not fire.
+        """
+        self._price_provider = fn
+
+    def _mon_usd(self) -> float:
+        """Current MON->USD rate from the injected provider (0.0 if none)."""
+        if self._price_provider is None:
+            return 0.0
+        try:
+            value = float(self._price_provider() or 0.0)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("mon price provider failed: %s", exc)
+            return 0.0
+        return max(0.0, value)
 
     # -- main loop ---------------------------------------------------------
 
@@ -94,6 +114,7 @@ class PriceMonitor:
 
         # Fetch the price once per token to avoid hammering the RPC.
         price_cache: dict[str, float] = {}
+        mon_usd: Optional[float] = None  # lazy: only needed for USD alerts
         for alert in alerts:
             if not getattr(alert, "active", True):
                 continue
@@ -111,9 +132,30 @@ class PriceMonitor:
             if price <= 0.0:
                 continue  # unknown price: never trigger (avoids false "below")
 
+            # SPEC-v3 §4: USD alerts compare price_mon * mon_usd vs target_usd;
+            # MON alerts keep the v2 behaviour (compare vs target_mon).
+            currency = str(getattr(alert, "currency", "MON") or "MON").upper()
             direction = str(alert.direction).lower()
-            triggered = (direction == "above" and price >= alert.target_mon) or (
-                direction == "below" and price <= alert.target_mon
+            if currency == "USD":
+                target_usd = getattr(alert, "target_usd", None)
+                if target_usd is None or float(target_usd) <= 0:
+                    continue
+                if mon_usd is None:
+                    mon_usd = self._mon_usd()
+                    if mon_usd <= 0.0:
+                        logger.info(
+                            "no MON/USD price feed: USD price alerts paused"
+                        )
+                if mon_usd <= 0.0:
+                    continue  # USD alerts never fire without a price feed
+                compare_value = price * mon_usd
+                target = float(target_usd)
+            else:
+                compare_value = price
+                target = float(alert.target_mon)
+
+            triggered = (direction == "above" and compare_value >= target) or (
+                direction == "below" and compare_value <= target
             )
             if not triggered:
                 continue

@@ -45,19 +45,34 @@ EMOJI_PRESETS: dict[str, list[str]] = {
     "sell": ["🔴", "🟥", "❤️", "💔", "📉", "🩸", "🚨", "⬇️", "🍅", "👹"],
 }
 
-# Amount presets (MON) for min_buy_mon / whale_mon / emoji_step_mon.
-AMOUNT_PRESETS: list[float] = [1, 5, 10, 50, 100]
+# Amount presets in USDT (SPEC-v3 §5.2) for the *_usdt threshold fields.
+AMOUNT_PRESETS: list[float] = [5, 25, 100, 500, 1000]
 
 # emoji kind -> GroupSettings attribute
 EMOJI_KIND_TO_ATTR = {"buy": "buy_emoji", "whale": "whale_emoji", "sell": "sell_emoji"}
 
-# amount field -> GroupSettings attribute (identity, kept for clarity)
-AMOUNT_FIELDS = ("min_buy_mon", "whale_mon", "emoji_step_mon")
+# amount field -> GroupSettings attribute (SPEC-v3: USDT thresholds only;
+# the legacy *_mon fields stay in the schema but are not edited by the UI)
+AMOUNT_FIELDS = ("min_buy_usdt", "whale_usdt", "emoji_step_usdt")
+
+# amount field -> i18n label key (SPEC-v3 §5.2)
+AMOUNT_FIELD_LABELS = {
+    "min_buy_usdt": "ui.btn_minbuy_usdt",
+    "whale_usdt": "ui.btn_whale_usdt",
+    "emoji_step_usdt": "ui.btn_emojistep_usdt",
+}
 
 # toggle field -> GroupSettings attribute
 TOGGLE_FIELDS = ("sell_alerts", "scanner_alerts")
 
-_DEFAULTS = {"sell_emoji": "🔴", "sell_alerts": False, "scanner_alerts": False}
+_DEFAULTS = {
+    "sell_emoji": "🔴",
+    "sell_alerts": False,
+    "scanner_alerts": False,
+    "min_buy_usdt": 5.0,
+    "whale_usdt": 500.0,
+    "emoji_step_usdt": 25.0,
+}
 
 
 def _setting(settings: GroupSettings, name: str):
@@ -103,20 +118,20 @@ def build_settings_keyboard(settings: GroupSettings, lang: str) -> InlineKeyboar
         ],
         [
             InlineKeyboardButton(
-                t(lang, "ui.btn_minbuy", value=_fmt_amount(settings.min_buy_mon)),
-                callback_data="cfg:amount:min_buy_mon",
+                t(lang, "ui.btn_minbuy_usdt", value=_fmt_amount(_setting(settings, "min_buy_usdt"))),
+                callback_data="cfg:amount:min_buy_usdt",
             )
         ],
         [
             InlineKeyboardButton(
-                t(lang, "ui.btn_whale", value=_fmt_amount(settings.whale_mon)),
-                callback_data="cfg:amount:whale_mon",
+                t(lang, "ui.btn_whale_usdt", value=_fmt_amount(_setting(settings, "whale_usdt"))),
+                callback_data="cfg:amount:whale_usdt",
             )
         ],
         [
             InlineKeyboardButton(
-                t(lang, "ui.btn_emojistep", value=_fmt_amount(settings.emoji_step_mon)),
-                callback_data="cfg:amount:emoji_step_mon",
+                t(lang, "ui.btn_emojistep_usdt", value=_fmt_amount(_setting(settings, "emoji_step_usdt"))),
+                callback_data="cfg:amount:emoji_step_usdt",
             )
         ],
         [
@@ -166,7 +181,7 @@ def build_emoji_preset_keyboard(kind: str) -> InlineKeyboardMarkup:
 
 
 def build_amount_keyboard(field: str) -> InlineKeyboardMarkup:
-    """Amount presets (1/5/10/50/100 MON) + custom for a numeric field."""
+    """Amount presets (5/25/100/500/1000 USDT) + custom for a numeric field."""
     rows = [
         [
             InlineKeyboardButton(
@@ -211,12 +226,15 @@ def set_bot_username(username: str | None) -> None:
 
 
 def build_start_keyboard(lang: str) -> InlineKeyboardMarkup:
-    """Welcome keyboard: ⚙️ Settings · 📖 Help · ➕ Add me to your group."""
+    """Welcome keyboard: ⚙️ Settings · 📖 Help · ➕ Track token · Add me."""
     rows = [
         [
             InlineKeyboardButton(t(lang, "ui.btn_settings"), callback_data="cfg:menu"),
             InlineKeyboardButton(t(lang, "ui.btn_help"), callback_data="cfg:help"),
-        ]
+        ],
+        [
+            InlineKeyboardButton(t(lang, "ui.btn_setup"), callback_data="cfg:setup"),
+        ],
     ]
     if _bot_username:
         rows.append(
@@ -228,3 +246,57 @@ def build_start_keyboard(lang: str) -> InlineKeyboardMarkup:
             ]
         )
     return InlineKeyboardMarkup(rows)
+
+
+# ---------------------------------------------------------------------------
+# SPEC-v3 §5.1 — guided token-setup wizard
+# ---------------------------------------------------------------------------
+
+
+def build_wizard_card_keyboard(lang: str) -> InlineKeyboardMarkup:
+    """Token card actions: ✅ Start tracking · ❌ Cancel."""
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    t(lang, "wizard.btn_track"), callback_data="cfg:wizard:track"
+                ),
+                InlineKeyboardButton(
+                    t(lang, "wizard.btn_cancel"), callback_data="cfg:wizard:cancel"
+                ),
+            ]
+        ]
+    )
+
+
+def build_wizard_quick_keyboard(lang: str) -> InlineKeyboardMarkup:
+    """Quick-config menu shown right after a token is tracked.
+
+    Each button opens the existing v2 sub-menu (cfg:* callbacks); ✔️ Done
+    shows the final settings summary.
+    """
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    t(lang, "wizard.btn_emoji"), callback_data="cfg:emoji:buy"
+                ),
+                InlineKeyboardButton(
+                    t(lang, "wizard.btn_minbuy"), callback_data="cfg:amount:min_buy_usdt"
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    t(lang, "wizard.btn_whale"), callback_data="cfg:amount:whale_usdt"
+                ),
+                InlineKeyboardButton(
+                    t(lang, "wizard.btn_language"), callback_data="cfg:lang"
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    t(lang, "wizard.btn_done"), callback_data="cfg:wizard:done"
+                ),
+            ],
+        ]
+    )

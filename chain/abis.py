@@ -288,3 +288,17 @@ USDT_ADDRESS = "0xe7cd86e13AC4309349F30B3435a9d337750fC82D"
 WETH_ADDRESS = "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242"
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+
+# ---------------------------------------------------------------------------
+# WMON/USDC pair (SPEC-v3 §3) — used to price MON in USD on-chain.
+#
+# Verified on-chain against https://rpc.monad.xyz (chain ID 143) on the
+# PancakeSwap v2-style factory 0x02a84c1b3BBD7401a5f7fa98a384EBC70bB5749E:
+#   factory.getPair(WMON, USDC) -> 0x27AA322b3f8Ba9d0041Df99c33fE4f3CC135E054
+#   pair.token0() -> 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A (WMON, 18 dec)
+#   pair.token1() -> 0x754704Bc059F8C67012fEd69BC8A327a5aafb603 (USDC, 6 dec)
+#   getReserves()  -> ~16.77 WMON / ~0.3479 USDC  =>  MON ≈ $0.0207
+# (token symbols/decimals confirmed via ERC20 symbol()/decimals() calls.)
+# ---------------------------------------------------------------------------
+PANCAKESWAP_V2_FACTORY = "0x02a84c1b3BBD7401a5f7fa98a384EBC70bB5749E"
+WMON_USDC_PAIR = "0x27AA322b3f8Ba9d0041Df99c33fE4f3CC135E054"

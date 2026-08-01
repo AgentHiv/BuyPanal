@@ -23,7 +23,8 @@ class Config:
     DB_PATH: str = "data/bot.db"
     POLL_INTERVAL: float = 4.0          # seconds
     BLOCKS_PER_POLL: int = 50
-    MON_USD_PRICE: float = 0.0          # 0 = unknown/None in alerts
+    MON_USD_PRICE: float = 0.0          # 0 = auto (SPEC-v3: on-chain WMON/USDC); >0 = manual override
+    MON_PRICE_REFRESH_SEC: int = 300    # SPEC-v3: background MON/USD price refresh interval
     EXPLORER_URL: str = "https://monadvision.com"
     BUY_URL_TEMPLATE: str = DEFAULT_BUY_URL_TEMPLATE  # e.g. "https://nad.fun/token/{token}"
     NAD_FUN_LENS: str = ""              # optional lens/factory address, "" if unused
@@ -75,6 +76,7 @@ def load_config() -> Config:
         POLL_INTERVAL=_get_float("POLL_INTERVAL", 4.0),
         BLOCKS_PER_POLL=_get_int("BLOCKS_PER_POLL", 50),
         MON_USD_PRICE=_get_float("MON_USD_PRICE", 0.0),
+        MON_PRICE_REFRESH_SEC=_get_int("MON_PRICE_REFRESH_SEC", 300),
         EXPLORER_URL=os.environ.get("EXPLORER_URL", "https://monadvision.com"),
         BUY_URL_TEMPLATE=os.environ.get("BUY_URL_TEMPLATE", DEFAULT_BUY_URL_TEMPLATE),
         NAD_FUN_LENS=os.environ.get("NAD_FUN_LENS", ""),

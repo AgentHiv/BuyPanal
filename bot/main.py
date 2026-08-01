@@ -90,9 +90,18 @@ def run() -> None:
     app.bot_data["config"] = config
 
     # --- buy/sell listener wiring ------------------------------------------
+    def _current_mon_usd() -> float:
+        """Best known MON price in USD (auto cache, else manual override)."""
+        return float(
+            app.bot_data.get("mon_usd_price")
+            or getattr(config, "MON_USD_PRICE", 0.0)
+            or 0.0
+        )
+
     async def on_event(chat_ids: list[int], event) -> None:
         """Handle BuyEvent and SellEvent from the listener (SPEC-v2 §8.3)."""
         is_sell = SellEvent is not None and isinstance(event, SellEvent)
+        mon_usd = _current_mon_usd()  # SPEC-v3: USDT thresholds need the rate
         curve = None
         if getattr(event, "kind", None) == "curve":
             try:
@@ -110,10 +119,10 @@ def run() -> None:
                     if send_sell is None:
                         logger.warning("notifier.send_sell_alert not available yet")
                         continue
-                    await send_sell(app.bot, chat_id, settings, event, curve)
+                    await send_sell(app.bot, chat_id, settings, event, curve, mon_usd=mon_usd)
                 else:
                     db.record_buy(chat_id, event)
-                    await notifier.send_buy_alert(app.bot, chat_id, settings, event, curve)
+                    await notifier.send_buy_alert(app.bot, chat_id, settings, event, curve, mon_usd=mon_usd)
             except Exception:
                 logger.exception("failed to notify chat %s", chat_id)
 
@@ -135,18 +144,26 @@ def run() -> None:
             logger.exception("deactivate_price_alert failed for %s", alert.id)
         try:
             lang = db.get_settings(alert.chat_id).language
+            # SPEC-v3: USD alerts report USDT values; MON alerts keep MON.
+            if getattr(alert, "currency", "MON") == "USD" and alert.target_usd is not None:
+                mon_usd = _current_mon_usd()
+                price_str = f"{current_price_mon * mon_usd:,.4f} USDT"
+                target_str = f"{alert.target_usd:g} USDT"
+            else:
+                price_str = f"{current_price_mon:g} MON"
+                target_str = f"{alert.target_mon:g} MON"
             text = t(
                 lang,
-                "adv.pricealert.triggered",
+                "adv.pricealert_triggered",
                 symbol=alert.token_address,
                 direction=alert.direction,
-                target=f"{alert.target_mon:g}",
-                price=f"{current_price_mon:g}",
+                target=target_str,
+                price=price_str,
             )
-            if text == "adv.pricealert.triggered":  # adv locales not merged yet
+            if text == "adv.pricealert_triggered":  # adv locales not merged yet
                 text = (
                     f"🔔 Price alert: {alert.token_address} is now "
-                    f"{current_price_mon:g} MON ({alert.direction} {alert.target_mon:g} MON)"
+                    f"{price_str} ({alert.direction} {target_str})"
                 )
             await app.bot.send_message(
                 chat_id=alert.chat_id,
@@ -163,6 +180,9 @@ def run() -> None:
             provider = getattr(db, "all_active_price_alerts", None)
             if callable(provider) and hasattr(monitor, "set_alert_provider"):
                 monitor.set_alert_provider(provider)
+            # SPEC-v3: USD-denominated alerts need the MON->USD rate
+            if hasattr(monitor, "set_price_provider"):
+                monitor.set_price_provider(_current_mon_usd)
         except Exception:
             logger.exception("failed to initialise PriceMonitor")
             monitor = None
@@ -233,6 +253,31 @@ def run() -> None:
         except Exception:
             logger.exception("failed to register advanced handlers")
 
+    # --- MON/USD price auto-refresh (SPEC-v3 §3) ----------------------------
+    async def _mon_price_loop() -> None:
+        """Refresh the on-chain MON/USD price into bot_data periodically.
+
+        Manual override: when Config.MON_USD_PRICE > 0 the override is used
+        and no on-chain call is made (handled inside get_mon_usd_price).
+        """
+        try:
+            from chain.monprice import get_mon_usd_price
+        except ImportError:  # pragma: no cover
+            logger.warning("chain.monprice not available; MON/USD auto-price disabled")
+            return
+        interval = max(30, int(getattr(config, "MON_PRICE_REFRESH_SEC", 300) or 300))
+        while True:
+            try:
+                price = await get_mon_usd_price()
+                if price > 0:
+                    app.bot_data["mon_usd_price"] = price
+                    logger.debug("MON/USD price refreshed: %s", price)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("MON/USD price refresh failed")
+            await asyncio.sleep(interval)
+
     # --- lifecycle ---------------------------------------------------------
     async def post_init(application: Application) -> None:
         commands = list(BOT_COMMANDS)
@@ -266,6 +311,9 @@ def run() -> None:
             application.bot_data["scanner_task"] = asyncio.create_task(scanner.start())
             logger.info("new-token scanner started")
 
+        application.bot_data["monprice_task"] = asyncio.create_task(_mon_price_loop())
+        logger.info("MON/USD price refresh started")
+
     async def _stop_task(name: str, obj, application: Application) -> None:
         try:
             await obj.stop()
@@ -285,6 +333,13 @@ def run() -> None:
             await _stop_task("monitor", monitor, application)
         if scanner is not None:
             await _stop_task("scanner", scanner, application)
+        monprice_task = application.bot_data.get("monprice_task")
+        if monprice_task is not None:
+            monprice_task.cancel()
+            try:
+                await monprice_task
+            except asyncio.CancelledError:
+                pass
 
     app.post_init = post_init
     app.post_shutdown = post_shutdown

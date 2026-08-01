@@ -34,7 +34,7 @@ _DASHBOARD_MAX_TOKENS = 10
 
 # (command, description) — merged into set_my_commands by bot/main.py.
 ADVANCED_COMMANDS = [
-    ("pricealert", "Set a price alert: /pricealert <address> <above|below> <price_MON>"),
+    ("pricealert", "Set a price alert in USDT: /pricealert <address> <above|below> <target_USDT>"),
     ("alerts", "List and manage your price alerts"),
     ("scanner", "Toggle new incubation-token launch alerts"),
     ("sells", "Toggle sell alerts in this group"),
@@ -166,7 +166,7 @@ async def cmd_pricealert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     lang = _lang(update, context)
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id if update.effective_user else 0
-    usage = "/pricealert <address> <above|below> <price_MON>"
+    usage = "/pricealert <address> <above|below> <target_USDT>"
 
     args = list(context.args or [])
     if len(args) != 3 or not EVM_ADDRESS_RE.match(args[0].strip()):
@@ -185,7 +185,11 @@ async def cmd_pricealert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(t(lang, "adv.invalid_args", usage=usage))
         return
 
-    alert_id = deps.db.add_price_alert(chat_id, address, direction, target, user_id)
+    # SPEC-v3 §4: the target is USDT; the alert is stored as currency="USD".
+    alert_id = deps.db.add_price_alert(
+        chat_id, address, direction, 0.0, user_id,
+        target_usd=target, currency="USD",
+    )
     symbol = await _token_label(address)
     await update.message.reply_text(
         t(
@@ -213,6 +217,10 @@ async def _alerts_text_and_keyboard(db, chat_id: int, lang: str):
     buttons = []
     for alert in alerts:
         symbol = await _token_label(alert.token_address)
+        if getattr(alert, "currency", "MON") == "USD" and alert.target_usd is not None:
+            target = f"{alert.target_usd:g} USDT"
+        else:
+            target = f"{alert.target_mon:g} MON"
         lines.append(
             t(
                 lang,
@@ -220,7 +228,7 @@ async def _alerts_text_and_keyboard(db, chat_id: int, lang: str):
                 id=alert.id,
                 symbol=symbol,
                 direction=alert.direction,
-                target=f"{alert.target_mon:g}",
+                target=target,
             )
         )
         buttons.append(
