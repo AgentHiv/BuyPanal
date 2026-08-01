@@ -59,5 +59,37 @@
     "row": "{rank}. {buyer} — {total_mon} MON",
     "empty": "暂无买入记录。"
   },
-  "about": "🤖 Monad 买入提醒机器人\n\n为 Monad（链 ID 143）上的任意代币提供实时买入提醒：支持 DEX 交易与 nad.fun 风格的孵化代币，每个群组可自定义表情、阈值和语言。\n\n浏览器：https://monadvision.com"
+  "about": "🤖 Monad 买入提醒机器人\n\n为 Monad（链 ID 143）上的任意代币提供实时买入提醒：支持 DEX 交易与 nad.fun 风格的孵化代币，每个群组可自定义表情、阈值和语言。\n\n浏览器：https://monadvision.com",
+  "ui": {
+    "settings_title": "⚙️ 设置 — 点击下方按钮修改对应选项：",
+    "btn_language": "🌐 语言：{value}",
+    "btn_emoji_buy": "🎨 买入表情：{value}",
+    "btn_emoji_whale": "🐋 鲸鱼表情：{value}",
+    "btn_emoji_sell": "🔴 卖出表情：{value}",
+    "btn_minbuy": "💰 最小买入：{value} MON",
+    "btn_whale": "🐳 鲸鱼阈值：{value} MON",
+    "btn_emojistep": "🔢 表情步长：{value} MON",
+    "btn_tokens": "📋 已追踪代币",
+    "btn_toggle_sells": "🔴 卖出提醒：{value}",
+    "btn_toggle_scanner": "🆕 新代币提醒：{value}",
+    "btn_back": "⬅️ 返回",
+    "btn_close": "❌ 关闭",
+    "btn_custom": "✏️ 自定义",
+    "btn_settings": "⚙️ 设置",
+    "btn_help": "📖 帮助",
+    "on": "开启",
+    "off": "关闭",
+    "choose_language": "🌐 请选择语言：",
+    "choose_emoji": "🎨 选择一个表情，或点击 ✏️ 自定义发送自己的表情：",
+    "choose_amount": "💰 选择一个 MON 数值，或点击 ✏️ 自定义：",
+    "custom_prompt_emoji": "✏️ 回复此消息，发送你想使用的表情（1–4 个表情字符）。",
+    "custom_prompt_amount": "✏️ 回复此消息，发送 MON 数值（大于 0 的数字）。",
+    "saved": "✅ 已保存。",
+    "invalid_emoji": "⚠️ 这看起来不像表情符号。请发送 1–4 个表情字符（不含字母或数字）。",
+    "invalid_number": "⚠️ 请发送大于 0 的数字。",
+    "token_deleted": "🗑️ 代币已移除。",
+    "no_tokens": "尚未追踪任何代币。管理员可使用 /addtoken <address> 添加。",
+    "start_buttons_help": "点击 ⚙️ 设置，用按钮即可配置本群的提醒，无需输入命令。",
+    "add_to_group": "➕ 把我添加到你的群组"
+  }
 }

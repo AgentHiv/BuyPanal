@@ -20,6 +20,8 @@ from chain import price as chain_price
 from core.db import Database
 from core.i18n import SUPPORTED_LANGS, t
 
+from bot import keyboards
+
 logger = logging.getLogger(__name__)
 
 EVM_ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
@@ -114,7 +116,22 @@ async def _reply_error(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(t(_lang(update, context), "welcome"))
+    lang = _lang(update, context)
+    chat = update.effective_chat
+    if chat is not None and chat.type != Chat.PRIVATE:
+        # groups: welcome + button menu (Settings / Help / Add me)
+        if keyboards._bot_username is None:
+            try:
+                me = await context.bot.get_me()
+                keyboards.set_bot_username(me.username)
+            except Exception:
+                logger.debug("could not resolve bot username", exc_info=True)
+        await update.message.reply_text(
+            f"{t(lang, 'welcome')}\n\n{t(lang, 'ui.start_buttons_help')}",
+            reply_markup=keyboards.build_start_keyboard(lang),
+        )
+        return
+    await update.message.reply_text(t(lang, "welcome"))
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -193,8 +210,13 @@ async def cmd_tokens(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not tokens:
         await update.message.reply_text(t(lang, "token.list_empty"))
         return
-    lines = [t(lang, "token.list_header")] + [f"`{addr}`" for addr in tokens]
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    lines = [t(lang, "token.list_header", count=len(tokens))]
+    lines += [f"`{addr}`" for addr in tokens]
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=keyboards.build_tokens_keyboard(tokens, lang),
+    )
 
 
 @admin_only
@@ -388,21 +410,14 @@ async def cmd_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def cmd_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Open the button-based settings menu (anyone can view it)."""
     db = _db(context)
     chat_id = update.effective_chat.id
     lang = _lang(update, context)
-    s = db.get_settings(chat_id)
+    settings = db.get_settings(chat_id)
     await update.message.reply_text(
-        t(
-            lang,
-            "settings.show",
-            language=s.language,
-            buy_emoji=s.buy_emoji,
-            whale_emoji=s.whale_emoji,
-            min_buy_mon=f"{s.min_buy_mon:g}",
-            whale_mon=f"{s.whale_mon:g}",
-            emoji_step_mon=f"{s.emoji_step_mon:g}",
-        )
+        t(lang, "ui.settings_title"),
+        reply_markup=keyboards.build_settings_keyboard(settings, lang),
     )
 
 

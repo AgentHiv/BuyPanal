@@ -59,5 +59,37 @@
     "row": "{rank}. {buyer} — {total_mon} MON",
     "empty": "No buys recorded yet."
   },
-  "about": "🤖 Monad Buy Bot\n\nReal-time buy alerts for any token on Monad (chain ID 143): DEX trades and nad.fun-style incubation tokens, with per-group emojis, thresholds and language.\n\nExplorer: https://monadvision.com"
+  "about": "🤖 Monad Buy Bot\n\nReal-time buy alerts for any token on Monad (chain ID 143): DEX trades and nad.fun-style incubation tokens, with per-group emojis, thresholds and language.\n\nExplorer: https://monadvision.com",
+  "ui": {
+    "settings_title": "⚙️ Settings — tap a button below to change a value:",
+    "btn_language": "🌐 Language: {value}",
+    "btn_emoji_buy": "🎨 Buy emoji: {value}",
+    "btn_emoji_whale": "🐋 Whale emoji: {value}",
+    "btn_emoji_sell": "🔴 Sell emoji: {value}",
+    "btn_minbuy": "💰 Min buy: {value} MON",
+    "btn_whale": "🐳 Whale threshold: {value} MON",
+    "btn_emojistep": "🔢 Emoji step: {value} MON",
+    "btn_tokens": "📋 Tracked tokens",
+    "btn_toggle_sells": "🔴 Sell alerts: {value}",
+    "btn_toggle_scanner": "🆕 New-token alerts: {value}",
+    "btn_back": "⬅️ Back",
+    "btn_close": "❌ Close",
+    "btn_custom": "✏️ Custom",
+    "btn_settings": "⚙️ Settings",
+    "btn_help": "📖 Help",
+    "on": "ON",
+    "off": "OFF",
+    "choose_language": "🌐 Choose a language:",
+    "choose_emoji": "🎨 Choose an emoji, or tap ✏️ Custom to send your own:",
+    "choose_amount": "💰 Choose a value in MON, or tap ✏️ Custom:",
+    "custom_prompt_emoji": "✏️ Reply to this message with the emoji you want to use (1–4 emoji characters).",
+    "custom_prompt_amount": "✏️ Reply to this message with the value in MON (a number greater than 0).",
+    "saved": "✅ Saved.",
+    "invalid_emoji": "⚠️ That doesn't look like an emoji. Please send 1–4 emoji characters (no letters or numbers).",
+    "invalid_number": "⚠️ Please send a number greater than 0.",
+    "token_deleted": "🗑️ Token removed.",
+    "no_tokens": "No tokens tracked yet. Admins can add one with /addtoken <address>.",
+    "start_buttons_help": "Tap ⚙️ Settings to configure this group's alerts with buttons — no commands needed.",
+    "add_to_group": "➕ Add me to your group"
+  }
 }

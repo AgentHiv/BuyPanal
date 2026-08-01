@@ -1,23 +1,71 @@
-"""Application builder: wires Database, BuyListener, handlers and notifier."""
+"""Application builder: wires Database, BuyListener, handlers and notifier.
+
+SPEC-v2 §8.3: builds the shared ``deps`` namespace, registers the advanced
+command module and the button-menu callbacks (both behind ImportError
+guards so the bot keeps working while the parallel modules are developed),
+and wires the price monitor / new-token scanner as background tasks.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 import os
+from types import SimpleNamespace
 
+from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler
 
 from chain.incubation import get_curve_info
 from chain.listener import BuyListener
 from core.config import load_config
 from core.db import Database
-from core.models import BuyEvent
+from core.i18n import t
 
 from bot import notifier
 from bot.handlers import BOT_COMMANDS, HANDLERS
 
 logger = logging.getLogger(__name__)
+
+# --- guarded parallel-module imports (SPEC-v2: modules built by Coder E) ---
+try:  # button-menu callbacks live in this branch; guard kept for symmetry
+    from bot import callbacks as ui_callbacks
+except ImportError:  # pragma: no cover
+    ui_callbacks = None
+    logger.warning("bot.callbacks not available; button menus disabled")
+
+try:
+    from bot import advanced_handlers
+except ImportError:
+    advanced_handlers = None
+    logger.info("bot.advanced_handlers not available yet; advanced commands disabled")
+
+try:
+    from chain.monitor import PriceMonitor
+except ImportError:
+    PriceMonitor = None
+    logger.info("chain.monitor not available yet; price alerts disabled")
+
+try:
+    from chain.scanner import NewTokenScanner
+except ImportError:
+    NewTokenScanner = None
+    logger.info("chain.scanner not available yet; launch scanner disabled")
+
+try:
+    from core.models import SellEvent
+except ImportError:
+    SellEvent = None
+
+
+def _link_buttons(config, token_address: str) -> InlineKeyboardMarkup:
+    """[Chart][Buy] buttons for monitor/scanner messages."""
+    chart_url = f"{config.EXPLORER_URL.rstrip('/')}/token/{token_address}"
+    template = config.BUY_URL_TEMPLATE or "https://nad.fun/token/{token}"
+    buy_url = template.replace("{token}", token_address) if "{token}" in template else template
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton("Chart", url=chart_url), InlineKeyboardButton("Buy", url=buy_url)]]
+    )
 
 
 def run() -> None:
@@ -41,32 +89,167 @@ def run() -> None:
     app.bot_data["db"] = db
     app.bot_data["config"] = config
 
-    # --- buy listener wiring ---------------------------------------------
-    async def on_buy(chat_ids: list[int], buy: BuyEvent) -> None:
+    # --- buy/sell listener wiring ------------------------------------------
+    async def on_event(chat_ids: list[int], event) -> None:
+        """Handle BuyEvent and SellEvent from the listener (SPEC-v2 §8.3)."""
+        is_sell = SellEvent is not None and isinstance(event, SellEvent)
         curve = None
-        if buy.kind == "curve":
+        if getattr(event, "kind", None) == "curve":
             try:
-                curve = await get_curve_info(buy.token_address)
+                curve = await get_curve_info(event.token_address)
             except Exception:
-                logger.exception("get_curve_info failed for %s", buy.token_address)
+                logger.exception("get_curve_info failed for %s", event.token_address)
         for chat_id in chat_ids:
             try:
                 settings = db.get_settings(chat_id)
-                db.record_buy(chat_id, buy)
-                await notifier.send_buy_alert(app.bot, chat_id, settings, buy, curve)
+                if is_sell:
+                    # sell alerts are opt-in per group
+                    if not getattr(settings, "sell_alerts", False):
+                        continue
+                    send_sell = getattr(notifier, "send_sell_alert", None)
+                    if send_sell is None:
+                        logger.warning("notifier.send_sell_alert not available yet")
+                        continue
+                    await send_sell(app.bot, chat_id, settings, event, curve)
+                else:
+                    db.record_buy(chat_id, event)
+                    await notifier.send_buy_alert(app.bot, chat_id, settings, event, curve)
             except Exception:
                 logger.exception("failed to notify chat %s", chat_id)
 
-    listener = BuyListener(on_buy)
+    listener = BuyListener(on_event)
     listener.set_chat_resolver(lambda address: db.all_tracked_tokens().get(address, []))
+    set_sell_callback = getattr(listener, "set_sell_callback", None)
+    if callable(set_sell_callback):
+        set_sell_callback(on_event)
     app.bot_data["listener"] = listener
+
+    # --- price monitor (guarded; built by Coder E) --------------------------
+    monitor = None
+
+    async def on_price_alert(alert, current_price_mon: float) -> None:
+        """Deactivate the triggered alert and notify the chat with buttons."""
+        try:
+            db.deactivate_price_alert(alert.id, alert.chat_id)
+        except Exception:
+            logger.exception("deactivate_price_alert failed for %s", alert.id)
+        try:
+            lang = db.get_settings(alert.chat_id).language
+            text = t(
+                lang,
+                "adv.pricealert.triggered",
+                symbol=alert.token_address,
+                direction=alert.direction,
+                target=f"{alert.target_mon:g}",
+                price=f"{current_price_mon:g}",
+            )
+            if text == "adv.pricealert.triggered":  # adv locales not merged yet
+                text = (
+                    f"🔔 Price alert: {alert.token_address} is now "
+                    f"{current_price_mon:g} MON ({alert.direction} {alert.target_mon:g} MON)"
+                )
+            await app.bot.send_message(
+                chat_id=alert.chat_id,
+                text=text,
+                reply_markup=_link_buttons(config, alert.token_address),
+                disable_web_page_preview=True,
+            )
+        except Exception:
+            logger.exception("failed to send price alert to chat %s", alert.chat_id)
+
+    if PriceMonitor is not None:
+        try:
+            monitor = PriceMonitor(on_price_alert)
+            provider = getattr(db, "all_active_price_alerts", None)
+            if callable(provider) and hasattr(monitor, "set_alert_provider"):
+                monitor.set_alert_provider(provider)
+        except Exception:
+            logger.exception("failed to initialise PriceMonitor")
+            monitor = None
+
+    # --- new-token scanner (guarded; built by Coder E) ----------------------
+    scanner = None
+
+    async def on_new_token(event) -> None:
+        """Broadcast a new incubation-token launch to opted-in chats."""
+        try:
+            chat_ids = db.list_known_chats()
+        except AttributeError:
+            # db without v2 helper yet: fall back to chats that track tokens
+            seen = set()
+            for ids in db.all_tracked_tokens().values():
+                seen.update(ids)
+            chat_ids = sorted(seen)
+        for chat_id in chat_ids:
+            try:
+                settings = db.get_settings(chat_id)
+                if not getattr(settings, "scanner_alerts", False):
+                    continue
+                lang = settings.language
+                text = t(
+                    lang,
+                    "adv.scanner.new_token",
+                    name=event.token_name,
+                    symbol=event.token_symbol,
+                    address=event.token_address,
+                )
+                if text == "adv.scanner.new_token":
+                    text = (
+                        f"🆕 New token launch: {event.token_name} "
+                        f"(${event.token_symbol})\n`{event.token_address}`"
+                    )
+                await app.bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    reply_markup=_link_buttons(config, event.token_address),
+                    disable_web_page_preview=True,
+                )
+            except Exception:
+                logger.exception("failed to send scanner alert to chat %s", chat_id)
+
+    if NewTokenScanner is not None and getattr(config, "SCANNER_ENABLED", True):
+        try:
+            scanner = NewTokenScanner(on_new_token)
+        except Exception:
+            logger.exception("failed to initialise NewTokenScanner")
+            scanner = None
+
+    # --- shared deps + command/callback registration ------------------------
+    deps = SimpleNamespace(db=db, listener=listener, monitor=monitor, scanner=scanner, config=config)
+    app.bot_data["deps"] = deps
 
     for name, fn in HANDLERS.items():
         app.add_handler(CommandHandler(name, fn))
 
+    if ui_callbacks is not None:
+        try:
+            ui_callbacks.register_callbacks(app, deps)
+        except Exception:
+            logger.exception("failed to register UI callbacks")
+
+    if advanced_handlers is not None:
+        try:
+            advanced_handlers.register(app, deps)
+        except Exception:
+            logger.exception("failed to register advanced handlers")
+
     # --- lifecycle ---------------------------------------------------------
     async def post_init(application: Application) -> None:
-        await application.bot.set_my_commands(BOT_COMMANDS)
+        commands = list(BOT_COMMANDS)
+        advanced = getattr(advanced_handlers, "ADVANCED_COMMANDS", None) if advanced_handlers else None
+        if advanced:
+            commands += [BotCommand(name, desc) for name, desc in advanced]
+        await application.bot.set_my_commands(commands)
+
+        # cache the bot username for the "Add me" URL button
+        try:
+            from bot import keyboards
+
+            me = await application.bot.get_me()
+            keyboards.set_bot_username(me.username)
+        except Exception:
+            logger.debug("could not resolve bot username", exc_info=True)
+
         # register tokens already stored in the db
         for address in db.all_tracked_tokens():
             try:
@@ -76,18 +259,32 @@ def run() -> None:
         application.bot_data["listener_task"] = asyncio.create_task(listener.start())
         logger.info("buy listener started")
 
-    async def post_shutdown(application: Application) -> None:
-        task = application.bot_data.get("listener_task")
+        if monitor is not None:
+            application.bot_data["monitor_task"] = asyncio.create_task(monitor.start())
+            logger.info("price monitor started")
+        if scanner is not None:
+            application.bot_data["scanner_task"] = asyncio.create_task(scanner.start())
+            logger.info("new-token scanner started")
+
+    async def _stop_task(name: str, obj, application: Application) -> None:
         try:
-            await listener.stop()
+            await obj.stop()
         except Exception:
-            logger.exception("listener.stop failed")
+            logger.exception("%s.stop failed", name)
+        task = application.bot_data.get(f"{name}_task")
         if task is not None:
             task.cancel()
             try:
                 await task
             except asyncio.CancelledError:
                 pass
+
+    async def post_shutdown(application: Application) -> None:
+        await _stop_task("listener", listener, application)
+        if monitor is not None:
+            await _stop_task("monitor", monitor, application)
+        if scanner is not None:
+            await _stop_task("scanner", scanner, application)
 
     app.post_init = post_init
     app.post_shutdown = post_shutdown

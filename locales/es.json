@@ -59,5 +59,37 @@
     "row": "{rank}. {buyer} — {total_mon} MON",
     "empty": "Aún no se han registrado compras."
   },
-  "about": "🤖 Monad Buy Bot\n\nAlertas de compra en tiempo real para cualquier token en Monad (chain ID 143): operaciones en DEX y tokens en incubación estilo nad.fun, con emojis, umbrales e idioma configurables por grupo.\n\nExplorador: https://monadvision.com"
+  "about": "🤖 Monad Buy Bot\n\nAlertas de compra en tiempo real para cualquier token en Monad (chain ID 143): operaciones en DEX y tokens en incubación estilo nad.fun, con emojis, umbrales e idioma configurables por grupo.\n\nExplorador: https://monadvision.com",
+  "ui": {
+    "settings_title": "⚙️ Configuración — toca un botón para cambiar un valor:",
+    "btn_language": "🌐 Idioma: {value}",
+    "btn_emoji_buy": "🎨 Emoji de compra: {value}",
+    "btn_emoji_whale": "🐋 Emoji de ballena: {value}",
+    "btn_emoji_sell": "🔴 Emoji de venta: {value}",
+    "btn_minbuy": "💰 Compra mínima: {value} MON",
+    "btn_whale": "🐳 Umbral de ballena: {value} MON",
+    "btn_emojistep": "🔢 Paso de emoji: {value} MON",
+    "btn_tokens": "📋 Tokens rastreados",
+    "btn_toggle_sells": "🔴 Alertas de venta: {value}",
+    "btn_toggle_scanner": "🆕 Alertas de nuevos tokens: {value}",
+    "btn_back": "⬅️ Volver",
+    "btn_close": "❌ Cerrar",
+    "btn_custom": "✏️ Personalizado",
+    "btn_settings": "⚙️ Configuración",
+    "btn_help": "📖 Ayuda",
+    "on": "Activado",
+    "off": "Desactivado",
+    "choose_language": "🌐 Elige un idioma:",
+    "choose_emoji": "🎨 Elige un emoji, o toca ✏️ Personalizado para enviar el tuyo:",
+    "choose_amount": "💰 Elige un valor en MON, o toca ✏️ Personalizado:",
+    "custom_prompt_emoji": "✏️ Responde a este mensaje con el emoji que quieras usar (1–4 caracteres emoji).",
+    "custom_prompt_amount": "✏️ Responde a este mensaje con el valor en MON (un número mayor que 0).",
+    "saved": "✅ Guardado.",
+    "invalid_emoji": "⚠️ Eso no parece un emoji. Envía 1–4 caracteres emoji (sin letras ni números).",
+    "invalid_number": "⚠️ Envía un número mayor que 0.",
+    "token_deleted": "🗑️ Token eliminado.",
+    "no_tokens": "Aún no hay tokens rastreados. Los admins pueden añadir uno con /addtoken <address>.",
+    "start_buttons_help": "Toca ⚙️ Configuración para ajustar las alertas de este grupo con botones, sin comandos.",
+    "add_to_group": "➕ Añádeme a tu grupo"
+  }
 }

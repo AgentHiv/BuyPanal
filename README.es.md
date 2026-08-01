@@ -21,6 +21,9 @@ vinculación ("incubación").
   compradores por grupo.
 - **Botones en línea** — cada alerta enlaza a la transacción, al gráfico y a
   una página de compra.
+- **Configuración con botones** — `/settings` abre un menú interactivo:
+  idioma, emojis (con presets), umbrales, interruptores de ventas/escáner y
+  gestión de tokens, sin necesidad de memorizar comandos.
 - **Persistencia SQLite** — ajustes, tokens rastreados y estadísticas
   sobreviven a los reinicios.
 
@@ -54,12 +57,53 @@ vinculación ("incubación").
 | `/incubation [address]` | Progreso de la curva de vinculación (incubación) | no |
 | `/stats` | Estadísticas de compras de 24 h del grupo | no |
 | `/leaderboard` | Mejores compradores del grupo | no |
-| `/settings` | Mostrar ajustes actuales del grupo | no |
+| `/settings` | Abrir el menú de configuración con botones | no |
 | `/about` | Acerca de este bot | no |
 
 Los comandos de administración requieren ser administrador del grupo; en
 chats privados todos están permitidos. `[address]` es opcional y usa por
 defecto el primer token rastreado del grupo.
+
+## Configuración con botones
+
+Envía `/settings` en tu grupo y configúralo todo con botones en línea:
+
+- **Idioma** — selector de English / Español / 中文 (el actual marcado ✅).
+- **Emojis** — emojis de alerta de compra, ballena y venta. Elige entre más
+  de 10 presets por tipo (🟢🟩💚🚀🔥💰🤑⚡🦄🌕 para compras,
+  🐋🐳🦈🐙💎🏦👑🔱⚓🌊 para ballenas) o toca **✏️ Personalizado** y responde
+  con tu propio emoji (entrada guiada mediante ForceReply).
+- **Cantidades** — compra mínima, umbral de ballena y paso de emoji, con
+  presets de 1/5/10/50/100 MON o un valor personalizado (validado, debe ser
+  > 0).
+- **Interruptores** — alertas de venta y alertas de nuevos tokens (escáner),
+  activado/desactivado por grupo.
+- **Tokens** — la lista de tokens rastreados con un botón 🗑 por token para
+  dejar de rastrearlo. `/tokens` muestra los mismos botones.
+- `/start` en un grupo muestra accesos directos ⚙️ Configuración / 📖 Ayuda /
+  ➕ Añádeme.
+
+Cualquier miembro del grupo puede abrir y explorar los menús; solo los
+administradores pueden cambiar valores (la misma regla que los comandos de
+administración).
+
+## Herramientas avanzadas
+
+Cuando los módulos avanzados están habilitados, estos comandos extra están
+disponibles (alertas de precio, alertas de venta, escáner de lanzamientos,
+tarjeta de seguridad del token y un panel en vivo):
+
+| Comando | Descripción | Admin |
+|---|---|---|
+| `/pricealert <address> <above\|below> <price_MON>` | Establecer una alerta de precio para un token | no |
+| `/alerts` | Listar y gestionar tus alertas de precio | no |
+| `/scanner` | Activar/desactivar alertas de nuevos tokens en incubación | sí |
+| `/sells` | Activar/desactivar alertas de venta en este grupo | sí |
+| `/tokeninfo [address]` | Tarjeta de seguridad del token (liquidez, holders) | no |
+| `/dashboard` | Publicar un panel de estadísticas que se actualiza solo | sí |
+
+Las alertas de venta y del escáner también se pueden activar desde el menú
+de botones de `/settings`.
 
 ## Instalación
 

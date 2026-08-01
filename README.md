@@ -18,6 +18,9 @@ whale alerts and 24h stats — for both DEX-listed tokens and bonding-curve
 - **Stats & leaderboard** — 24h buy volume and top buyers per group.
 - **Inline buttons** — every alert links to the transaction, the chart and a
   buy page.
+- **Button-based configuration** — `/settings` opens an interactive inline
+  menu: language, emojis (with presets), thresholds, sell/scanner toggles
+  and token management, no commands to memorize.
 - **SQLite persistence** — settings, tracked tokens and stats survive restarts.
 
 ## Monad notes
@@ -48,12 +51,48 @@ whale alerts and 24h stats — for both DEX-listed tokens and bonding-curve
 | `/incubation [address]` | Bonding-curve (incubation) progress | no |
 | `/stats` | 24h buy stats for this group | no |
 | `/leaderboard` | Top buyers in this group | no |
-| `/settings` | Show current group settings | no |
+| `/settings` | Open the button-based settings menu | no |
 | `/about` | About this bot | no |
 
 Admin commands require group administrator rights; in private chats everyone
 is allowed. `[address]` is optional and defaults to the group's first tracked
 token.
+
+## Button-based configuration
+
+Send `/settings` in your group and configure everything with inline buttons:
+
+- **Language** — picker for English / Español / 中文 (current one marked ✅).
+- **Emojis** — buy, whale and sell alert emojis. Pick from 10+ presets per
+  type (🟢🟩💚🚀🔥💰🤑⚡🦄🌕 for buys, 🐋🐳🦈🐙💎🏦👑🔱⚓🌊 for whales) or tap
+  **✏️ Custom** and reply with your own emoji (guided input via ForceReply).
+- **Amounts** — min buy, whale threshold and emoji step, with 1/5/10/50/100
+  MON presets or a custom value (validated, must be > 0).
+- **Toggles** — sell alerts and new-token (scanner) alerts, ON/OFF per group.
+- **Tokens** — the tracked-token list with a 🗑 button per token to stop
+  tracking it. `/tokens` shows the same buttons.
+- `/start` in a group shows ⚙️ Settings / 📖 Help / ➕ Add me shortcuts.
+
+Anyone in the group can open and browse the menus; only group admins can
+change values (same rule as the admin commands).
+
+## Advanced tools
+
+When the advanced modules are enabled, these extra commands become
+available (price alerts, sell alerts, launch scanner, token security card
+and a live dashboard):
+
+| Command | Description | Admin |
+|---|---|---|
+| `/pricealert <address> <above\|below> <price_MON>` | Set a price alert for a token | no |
+| `/alerts` | List and manage your price alerts | no |
+| `/scanner` | Toggle new incubation-token launch alerts | yes |
+| `/sells` | Toggle sell alerts in this group | yes |
+| `/tokeninfo [address]` | Token security card (liquidity, holders) | no |
+| `/dashboard` | Post a live auto-updating stats dashboard | yes |
+
+Sell alerts and scanner alerts can also be toggled from the `/settings`
+button menu.
 
 ## Setup
 
