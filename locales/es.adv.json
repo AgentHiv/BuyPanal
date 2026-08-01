@@ -1,0 +1,34 @@
+{
+  "sell": {
+    "title": "VENTA",
+    "sold": "📦 Vendido",
+    "received": "💸 Recibido",
+    "seller": "👤 Vendedor"
+  },
+  "adv": {
+    "pricealert_set": "✅ Alerta de precio #{id} creada para {symbol}: avisar cuando el precio supere/baje de {target} MON ({direction}).",
+    "pricealert_triggered": "🔔 ¡Alerta de precio disparada!\n{name} (${symbol}) está ahora en {price} MON (objetivo: {direction} {target} MON).",
+    "alerts_title": "⏰ Alertas de precio activas:",
+    "alerts_empty": "No tienes alertas de precio activas. Crea una con /pricealert <address> <above|below> <precio_MON>.",
+    "alerts_row": "#{id} {symbol} {direction} {target} MON",
+    "alert_cancelled": "🗑️ Alerta de precio #{id} cancelada.",
+    "scanner_on": "🛰️ Alertas de nuevos tokens en incubación ACTIVADAS para este grupo.",
+    "scanner_off": "🛰️ Alertas de nuevos tokens en incubación DESACTIVADAS para este grupo.",
+    "sells_on": "🔴 Alertas de ventas ACTIVADAS para este grupo.",
+    "sells_off": "🔴 Alertas de ventas DESACTIVADAS para este grupo.",
+    "new_token_title": "🆕 Nuevo token en incubación",
+    "new_token_body": "{name} (${symbol})\nCurva: {curve}\n{link}",
+    "tokeninfo_title": "🔎 Información del token — {name} (${symbol})",
+    "tokeninfo_lines": "Suministro: {supply}\nPrecio: {price} MON\nCapitalización: {mcap}\nLiquidez: {liquidity}\nTop-10 holders: {holders}\nIncubación: {incubation}",
+    "tokeninfo_incubating": "🧪 en incubación ({pct})",
+    "tokeninfo_graduated": "🎓 graduado a DEX",
+    "tokeninfo_not_incubating": "no está en incubación",
+    "dashboard_title": "📊 Panel del grupo",
+    "dashboard_rows": "24h: {count} compras · {volume_mon} MON ({volume_usd})\n\nTokens rastreados:\n{tokens}",
+    "dashboard_token_row": "• {symbol}: {price} MON",
+    "dashboard_no_tokens": "(sin tokens rastreados)",
+    "btn_refresh": "🔄 Actualizar",
+    "btn_cancel": "❌ Cancelar",
+    "invalid_args": "⚠️ Argumentos inválidos. Uso: {usage}"
+  }
+}

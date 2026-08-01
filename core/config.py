@@ -27,6 +27,8 @@ class Config:
     EXPLORER_URL: str = "https://monadvision.com"
     BUY_URL_TEMPLATE: str = DEFAULT_BUY_URL_TEMPLATE  # e.g. "https://nad.fun/token/{token}"
     NAD_FUN_LENS: str = ""              # optional lens/factory address, "" if unused
+    SCANNER_ENABLED: bool = True        # SPEC-v2: new-token scanner on/off
+    PAIR_FACTORIES: str = ""            # SPEC-v2: comma-separated UniV2 factory addresses, "" = auto
 
 
 def _get_float(name: str, default: float) -> float:
@@ -49,6 +51,13 @@ def _get_int(name: str, default: int) -> int:
         return default
 
 
+def _get_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 def load_config() -> Config:
     """Build a Config from .env / environment variables.
 
@@ -68,4 +77,6 @@ def load_config() -> Config:
         EXPLORER_URL=os.environ.get("EXPLORER_URL", "https://monadvision.com"),
         BUY_URL_TEMPLATE=os.environ.get("BUY_URL_TEMPLATE", DEFAULT_BUY_URL_TEMPLATE),
         NAD_FUN_LENS=os.environ.get("NAD_FUN_LENS", ""),
+        SCANNER_ENABLED=_get_bool("SCANNER_ENABLED", True),
+        PAIR_FACTORIES=os.environ.get("PAIR_FACTORIES", ""),
     )

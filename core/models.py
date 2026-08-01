@@ -36,6 +36,51 @@ class BuyEvent:
 
 
 @dataclass
+class SellEvent:
+    """Mirror of BuyEvent for sales (SPEC-v2 1.2).
+
+    ``buyer`` holds the SELLER address and ``amount_mon`` is the MON
+    received by the seller.
+    """
+
+    token_address: str
+    token_symbol: str
+    token_name: str
+    buyer: str                   # seller address
+    amount_token: float          # human units sold
+    amount_mon: float            # MON received (0.0 if unknown)
+    amount_usd: Optional[float]  # None if no USD feed
+    price_mon: float             # unit price in MON (0.0 if unknown)
+    tx_hash: str                 # 0x...
+    pair_address: str            # pair/pool/curve the tokens went to
+    kind: str                    # "dex" | "curve"
+    block_number: int
+    timestamp: int               # unix seconds
+
+
+@dataclass
+class PriceAlert:
+    id: Optional[int]
+    chat_id: int
+    token_address: str
+    direction: str          # "above" | "below"
+    target_mon: float
+    created_by: int         # telegram user id
+    active: bool = True
+
+
+@dataclass
+class NewTokenEvent:
+    token_address: str
+    token_symbol: str
+    token_name: str
+    curve_address: str      # curve/factory/pair where it launched
+    tx_hash: str
+    block_number: int
+    timestamp: int          # unix seconds
+
+
+@dataclass
 class GroupSettings:
     chat_id: int
     language: str = "en"        # en | es | zh
@@ -44,6 +89,9 @@ class GroupSettings:
     min_buy_mon: float = 1.0    # min MON to alert
     whale_mon: float = 100.0    # whale threshold
     emoji_step_mon: float = 10.0  # 1 emoji repeated per this many MON
+    sell_alerts: bool = False   # SPEC-v2: alert sells too
+    scanner_alerts: bool = False  # SPEC-v2: alert new incubation tokens
+    sell_emoji: str = "🔴"      # SPEC-v2
 
 
 @dataclass

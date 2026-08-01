@@ -1,4 +1,4 @@
-"""Buy alert message formatting and sending (SPEC 5.10 / section 6)."""
+"""Buy/sell alert message formatting and sending (SPEC 5.10 + SPEC-v2 §7)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Optional
 
 from core.config import Config, load_config
 from core.i18n import t
-from core.models import BuyEvent, CurveInfo, GroupSettings
+from core.models import BuyEvent, CurveInfo, GroupSettings, SellEvent
 
 from bot.keyboards import buy_alert_keyboard
 
@@ -109,3 +109,61 @@ async def send_buy_alert(
         )
     except Exception:
         logger.exception("failed to send buy alert to chat %s", chat_id)
+
+
+async def send_sell_alert(
+    bot,
+    chat_id: int,
+    settings: GroupSettings,
+    sell: SellEvent,
+    curve: CurveInfo | None,
+) -> None:
+    """Format and send a sell alert (SPEC-v2 §7).
+
+    Same layout as the buy alert but titled with ``sell.title`` and using
+    ``settings.sell_emoji``; ``sell.buyer`` is the seller and
+    ``sell.amount_mon`` the MON received. The min-buy threshold is applied
+    the same way (amount_mon == 0.0 unknown -> still sent).
+    """
+    lang = settings.language
+
+    # min threshold filter (0.0 == unknown amount -> always alert)
+    if sell.amount_mon != 0.0 and sell.amount_mon < settings.min_buy_mon:
+        return
+
+    step = settings.emoji_step_mon if settings.emoji_step_mon > 0 else 1.0
+    count = min(20, max(1, int(sell.amount_mon / step)))
+    emojis = settings.sell_emoji * count
+
+    lines = [
+        f"{emojis} {t(lang, 'sell.title')} | "
+        f"{sell.token_name} (${sell.token_symbol}) {emojis}"
+    ]
+
+    received = f"{_fmt_num(sell.amount_mon)} MON"
+    if sell.amount_usd is not None:
+        received += f" (${sell.amount_usd:,.2f})"
+    lines.append(f"{t(lang, 'sell.received')}: {received}")
+
+    lines.append(
+        f"{t(lang, 'sell.sold')}: {_fmt_num(sell.amount_token)} {sell.token_symbol}"
+    )
+    lines.append(f"{t(lang, 'sell.seller')}: {_short_addr(sell.buyer)}")
+    lines.append(f"{t(lang, 'buy.price')}: {_fmt_num(sell.price_mon)} MON")
+
+    if curve is not None and curve.is_incubating:
+        pct = f"{curve.progress_pct:.0f}%" if curve.progress_pct is not None else "?%"
+        lines.append(f"{t(lang, 'buy.incubation')}: {pct}")
+
+    text = "\n".join(lines)
+    keyboard = buy_alert_keyboard(sell, _get_config())
+
+    try:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=keyboard,
+            disable_web_page_preview=True,
+        )
+    except Exception:
+        logger.exception("failed to send sell alert to chat %s", chat_id)

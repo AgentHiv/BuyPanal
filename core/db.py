@@ -1,4 +1,10 @@
-"""SQLite persistence for the Monad buy bot (SPEC 5.3)."""
+"""SQLite persistence for the Monad buy bot (SPEC 5.3 + SPEC-v2 §2).
+
+v2 additions: price alerts, new GroupSettings fields (sell_alerts,
+scanner_alerts, sell_emoji) and ``list_known_chats()``. Opening a v1
+database transparently migrates it via guarded ``ALTER TABLE`` statements
+(PRAGMA table_info) — it never fails.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +13,7 @@ import sqlite3
 import time
 from typing import TYPE_CHECKING
 
-from core.models import GroupSettings
+from core.models import GroupSettings, PriceAlert
 
 if TYPE_CHECKING:  # avoid a hard import cycle; BuyEvent is only typed
     from core.models import BuyEvent
@@ -45,7 +51,30 @@ CREATE TABLE IF NOT EXISTS buys (
 
 CREATE INDEX IF NOT EXISTS idx_buys_chat_ts ON buys (chat_id, ts);
 CREATE INDEX IF NOT EXISTS idx_buys_token ON buys (token_address);
+
+CREATE TABLE IF NOT EXISTS price_alerts (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id       INTEGER NOT NULL,
+    token_address TEXT    NOT NULL,
+    direction     TEXT    NOT NULL,
+    target_mon    REAL    NOT NULL,
+    created_by    INTEGER NOT NULL,
+    active        INTEGER NOT NULL DEFAULT 1,
+    created_at    INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_price_alerts_chat ON price_alerts (chat_id, active);
 """
+
+# Columns added in v2 to group_settings: (name, DDL fragment). New
+# databases get them via _migrate() too (kept out of _SCHEMA so the v1
+# CREATE TABLE stays byte-identical and the migration path is exercised
+# on every open).
+_SETTINGS_V2_COLUMNS = (
+    ("sell_alerts", "sell_alerts INTEGER NOT NULL DEFAULT 0"),
+    ("scanner_alerts", "scanner_alerts INTEGER NOT NULL DEFAULT 0"),
+    ("sell_emoji", "sell_emoji TEXT NOT NULL DEFAULT '🔴'"),
+)
 
 
 def _norm(address: str) -> str:
@@ -63,6 +92,27 @@ class Database:
         self._conn.row_factory = sqlite3.Row
         with self._conn:
             self._conn.executescript(_SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Add v2 columns to a v1 ``group_settings`` table. Never fails."""
+        try:
+            rows = self._conn.execute("PRAGMA table_info(group_settings)").fetchall()
+            existing = {row["name"] for row in rows}
+            with self._conn:
+                for name, ddl in _SETTINGS_V2_COLUMNS:
+                    if name in existing:
+                        continue
+                    try:
+                        self._conn.execute(
+                            f"ALTER TABLE group_settings ADD COLUMN {ddl}"
+                        )
+                    except sqlite3.Error:
+                        # Another process raced us, etc. — column likely there.
+                        pass
+        except sqlite3.Error:
+            # A broken/legacy database must still open; degrade gracefully.
+            pass
 
     def close(self) -> None:
         self._conn.close()
@@ -77,6 +127,7 @@ class Database:
         ).fetchone()
         if row is None:
             return GroupSettings(chat_id=chat_id)
+        keys = set(row.keys())  # tolerate unmigrated/legacy tables
         return GroupSettings(
             chat_id=row["chat_id"],
             language=row["language"],
@@ -85,6 +136,11 @@ class Database:
             min_buy_mon=row["min_buy_mon"],
             whale_mon=row["whale_mon"],
             emoji_step_mon=row["emoji_step_mon"],
+            sell_alerts=bool(row["sell_alerts"]) if "sell_alerts" in keys else False,
+            scanner_alerts=(
+                bool(row["scanner_alerts"]) if "scanner_alerts" in keys else False
+            ),
+            sell_emoji=row["sell_emoji"] if "sell_emoji" in keys else "🔴",
         )
 
     def save_settings(self, settings: GroupSettings) -> None:
@@ -93,15 +149,19 @@ class Database:
                 """
                 INSERT INTO group_settings (
                     chat_id, language, buy_emoji, whale_emoji,
-                    min_buy_mon, whale_mon, emoji_step_mon
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    min_buy_mon, whale_mon, emoji_step_mon,
+                    sell_alerts, scanner_alerts, sell_emoji
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(chat_id) DO UPDATE SET
                     language       = excluded.language,
                     buy_emoji      = excluded.buy_emoji,
                     whale_emoji    = excluded.whale_emoji,
                     min_buy_mon    = excluded.min_buy_mon,
                     whale_mon      = excluded.whale_mon,
-                    emoji_step_mon = excluded.emoji_step_mon
+                    emoji_step_mon = excluded.emoji_step_mon,
+                    sell_alerts    = excluded.sell_alerts,
+                    scanner_alerts = excluded.scanner_alerts,
+                    sell_emoji     = excluded.sell_emoji
                 """,
                 (
                     settings.chat_id,
@@ -111,6 +171,9 @@ class Database:
                     settings.min_buy_mon,
                     settings.whale_mon,
                     settings.emoji_step_mon,
+                    int(settings.sell_alerts),
+                    int(settings.scanner_alerts),
+                    settings.sell_emoji,
                 ),
             )
 
@@ -216,3 +279,89 @@ class Database:
         params.append(int(limit))
         rows = self._conn.execute(sql, params).fetchall()
         return [(row["buyer"], float(row["total_mon"])) for row in rows]
+
+    # ------------------------------------------------------------------
+    # price alerts (SPEC-v2 §2)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _row_to_alert(row: sqlite3.Row) -> PriceAlert:
+        return PriceAlert(
+            id=int(row["id"]),
+            chat_id=int(row["chat_id"]),
+            token_address=row["token_address"],
+            direction=row["direction"],
+            target_mon=float(row["target_mon"]),
+            created_by=int(row["created_by"]),
+            active=bool(row["active"]),
+        )
+
+    def add_price_alert(
+        self,
+        chat_id: int,
+        address: str,
+        direction: str,
+        target_mon: float,
+        created_by: int,
+    ) -> int:
+        """Insert a price alert and return its id."""
+        with self._conn:
+            cur = self._conn.execute(
+                """
+                INSERT INTO price_alerts (
+                    chat_id, token_address, direction, target_mon,
+                    created_by, active, created_at
+                ) VALUES (?, ?, ?, ?, ?, 1, ?)
+                """,
+                (
+                    chat_id,
+                    _norm(address),
+                    str(direction),
+                    float(target_mon),
+                    int(created_by),
+                    int(time.time()),
+                ),
+            )
+        return int(cur.lastrowid)
+
+    def list_price_alerts(
+        self, chat_id: int, active_only: bool = True
+    ) -> list[PriceAlert]:
+        sql = "SELECT * FROM price_alerts WHERE chat_id = ?"
+        params: list = [chat_id]
+        if active_only:
+            sql += " AND active = 1"
+        sql += " ORDER BY id"
+        rows = self._conn.execute(sql, params).fetchall()
+        return [self._row_to_alert(row) for row in rows]
+
+    def deactivate_price_alert(self, alert_id: int, chat_id: int) -> bool:
+        """Mark alert inactive (scoped to its chat). False if not found."""
+        with self._conn:
+            cur = self._conn.execute(
+                "UPDATE price_alerts SET active = 0"
+                " WHERE id = ? AND chat_id = ? AND active = 1",
+                (int(alert_id), int(chat_id)),
+            )
+        return cur.rowcount > 0
+
+    def all_active_price_alerts(self) -> list[PriceAlert]:
+        """Every active alert across all chats (used by PriceMonitor)."""
+        rows = self._conn.execute(
+            "SELECT * FROM price_alerts WHERE active = 1 ORDER BY id"
+        ).fetchall()
+        return [self._row_to_alert(row) for row in rows]
+
+    # ------------------------------------------------------------------
+    # misc (SPEC-v2 §8.3)
+    # ------------------------------------------------------------------
+    def list_known_chats(self) -> list[int]:
+        """Chats with saved settings OR tracked tokens (DISTINCT union)."""
+        rows = self._conn.execute(
+            """
+            SELECT chat_id FROM group_settings
+            UNION
+            SELECT chat_id FROM tracked_tokens
+            ORDER BY chat_id
+            """
+        ).fetchall()
+        return [int(row["chat_id"]) for row in rows]
