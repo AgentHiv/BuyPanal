@@ -1,0 +1,63 @@
+{
+  "welcome": "👋 欢迎使用 Monad 买入提醒机器人！\n\n追踪 Monad 上任意代币的买入——包括 DEX 已上线代币和孵化期（联合曲线）代币——并在本群实时接收提醒。\n\n使用 /help 查看所有命令。",
+  "help": "📖 命令列表：\n/start — 欢迎消息与机器人介绍\n/help — 显示本帮助\n/addtoken <address> — 在本群追踪某代币的买入（管理员）\n/removetoken <address> — 停止追踪某代币（管理员）\n/tokens — 列出已追踪的代币\n/setemoji <emoji> — 设置自定义买入提醒表情（管理员）\n/setwhaleemoji <emoji> — 设置自定义巨鲸提醒表情（管理员）\n/setlanguage <en|es|zh> — 设置群组语言（管理员）\n/setminbuy <MON> — 触发提醒的最小买入金额（管理员）\n/setwhale <MON> — 巨鲸提醒阈值（MON）（管理员）\n/price [address] — 代币价格（MON/USD）\n/mcap [address] — 代币市值\n/incubation [address] — 联合曲线（孵化）进度\n/stats — 本群 24 小时买入统计\n/leaderboard — 本群买入排行榜\n/settings — 查看当前群组设置\n/about — 关于本机器人",
+  "token": {
+    "added": "✅ 已开始在本群追踪 {address} 的买入。",
+    "exists": "ℹ️ {address} 已在追踪中。",
+    "removed": "🗑️ 已停止追踪 {address}。",
+    "not_found": "⚠️ 本群未在追踪 {address}。",
+    "list_empty": "尚未追踪任何代币。管理员可使用 /addtoken <address> 添加。",
+    "list_header": "📋 已追踪的代币（{count}）："
+  },
+  "settings": {
+    "updated": "✅ 设置已更新。",
+    "show": "⚙️ 群组设置：\n语言：{language}\n买入表情：{buy_emoji}\n巨鲸表情：{whale_emoji}\n最小买入：{min_buy_mon} MON\n巨鲸阈值：{whale_mon} MON\n表情步进：{emoji_step_mon} MON"
+  },
+  "language": {
+    "set": "🌐 群组语言已设置为 {language}。",
+    "invalid": "⚠️ 不支持的语言。可选：{languages}"
+  },
+  "emoji": {
+    "set": "✅ 买入提醒表情已设置为 {emoji}。"
+  },
+  "minbuy": {
+    "set": "✅ 最小买入提醒金额已设置为 {amount} MON。"
+  },
+  "whale": {
+    "set": "✅ 巨鲸提醒阈值已设置为 {amount} MON。"
+  },
+  "buy": {
+    "title": "买入",
+    "spent": "💸 花费",
+    "received": "📦 收到",
+    "buyer": "👤 买家",
+    "price": "💲 价格",
+    "mcap": "🏦 市值",
+    "incubation": "🧪 孵化进度",
+    "whale": "🐋 巨鲸提醒！"
+  },
+  "price": {
+    "line": "{symbol}：{price_mon} MON（{price_usd}）"
+  },
+  "error": {
+    "invalid_address": "⚠️ 无效地址：{address}",
+    "admin_only": "⛔ 仅群组管理员可使用此命令。",
+    "generic": "❌ 出错了，请稍后重试。"
+  },
+  "incubation": {
+    "title": "🧪 孵化 — {symbol}",
+    "progress": "进度：{progress}%（已筹集 {mon_raised} MON）",
+    "graduated": "🎓 {symbol} 已从联合曲线毕业并迁移至 DEX！",
+    "not_incubating": "{symbol} 当前不在联合曲线孵化中。"
+  },
+  "stats": {
+    "title": "📊 本群买入统计（24 小时）",
+    "line": "{symbol}：{count} 笔买入 · {volume_mon} MON（{volume_usd}）"
+  },
+  "leaderboard": {
+    "title": "🏆 本群买入排行榜",
+    "row": "{rank}. {buyer} — {total_mon} MON",
+    "empty": "暂无买入记录。"
+  },
+  "about": "🤖 Monad 买入提醒机器人\n\n为 Monad（链 ID 143）上的任意代币提供实时买入提醒：支持 DEX 交易与 nad.fun 风格的孵化代币，每个群组可自定义表情、阈值和语言。\n\n浏览器：https://monadvision.com"
+}

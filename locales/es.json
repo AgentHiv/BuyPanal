@@ -1,0 +1,63 @@
+{
+  "welcome": "👋 ¡Bienvenido al Monad Buy Bot!\n\nSigue las compras de cualquier token en Monad — tokens listados en DEX y tokens en incubación (curva de vinculación) — y recibe alertas en tiempo real en este grupo.\n\nUsa /help para ver todos los comandos.",
+  "help": "📖 Comandos:\n/start — Mensaje de bienvenida e introducción\n/help — Mostrar esta ayuda\n/addtoken <address> — Seguir las compras de un token en este grupo (admin)\n/removetoken <address> — Dejar de seguir un token (admin)\n/tokens — Listar los tokens seguidos\n/setemoji <emoji> — Emoji personalizado para alertas de compra (admin)\n/setwhaleemoji <emoji> — Emoji personalizado para alertas de ballena (admin)\n/setlanguage <en|es|zh> — Idioma del grupo (admin)\n/setminbuy <MON> — Compra mínima para disparar alertas (admin)\n/setwhale <MON> — Umbral de alerta de ballena en MON (admin)\n/price [address] — Precio del token en MON/USD\n/mcap [address] — Capitalización de mercado del token\n/incubation [address] — Progreso de la curva de vinculación (incubación)\n/stats — Estadísticas de compras de 24h de este grupo\n/leaderboard — Mayores compradores del grupo\n/settings — Mostrar la configuración actual del grupo\n/about — Acerca de este bot",
+  "token": {
+    "added": "✅ Ahora se siguen las compras de {address} en este grupo.",
+    "exists": "ℹ️ {address} ya está siendo seguido.",
+    "removed": "🗑️ Se dejó de seguir {address}.",
+    "not_found": "⚠️ {address} no está siendo seguido en este grupo.",
+    "list_empty": "Aún no hay tokens seguidos. Los administradores pueden añadir uno con /addtoken <address>.",
+    "list_header": "📋 Tokens seguidos ({count}):"
+  },
+  "settings": {
+    "updated": "✅ Configuración actualizada.",
+    "show": "⚙️ Configuración del grupo:\nIdioma: {language}\nEmoji de compra: {buy_emoji}\nEmoji de ballena: {whale_emoji}\nCompra mínima: {min_buy_mon} MON\nUmbral de ballena: {whale_mon} MON\nPaso de emoji: {emoji_step_mon} MON"
+  },
+  "language": {
+    "set": "🌐 Idioma del grupo cambiado a {language}.",
+    "invalid": "⚠️ Idioma no soportado. Disponibles: {languages}"
+  },
+  "emoji": {
+    "set": "✅ Emoji de alerta de compra cambiado a {emoji}."
+  },
+  "minbuy": {
+    "set": "✅ Compra mínima para alertas fijada en {amount} MON."
+  },
+  "whale": {
+    "set": "✅ Umbral de alerta de ballena fijado en {amount} MON."
+  },
+  "buy": {
+    "title": "COMPRA",
+    "spent": "💸 Gastado",
+    "received": "📦 Recibido",
+    "buyer": "👤 Comprador",
+    "price": "💲 Precio",
+    "mcap": "🏦 Capitalización",
+    "incubation": "🧪 Progreso de incubación",
+    "whale": "🐋 ¡ALERTA DE BALLENA!"
+  },
+  "price": {
+    "line": "{symbol}: {price_mon} MON ({price_usd})"
+  },
+  "error": {
+    "invalid_address": "⚠️ Dirección inválida: {address}",
+    "admin_only": "⛔ Solo los administradores del grupo pueden usar este comando.",
+    "generic": "❌ Algo salió mal. Inténtalo de nuevo más tarde."
+  },
+  "incubation": {
+    "title": "🧪 Incubación — {symbol}",
+    "progress": "Progreso: {progress}% ({mon_raised} MON recaudados)",
+    "graduated": "🎓 ¡{symbol} se graduó de la curva de vinculación a un DEX!",
+    "not_incubating": "{symbol} no está actualmente en incubación en una curva de vinculación."
+  },
+  "stats": {
+    "title": "📊 Estadísticas de compras de este grupo (24h)",
+    "line": "{symbol}: {count} compras · {volume_mon} MON ({volume_usd})"
+  },
+  "leaderboard": {
+    "title": "🏆 Mayores compradores de este grupo",
+    "row": "{rank}. {buyer} — {total_mon} MON",
+    "empty": "Aún no se han registrado compras."
+  },
+  "about": "🤖 Monad Buy Bot\n\nAlertas de compra en tiempo real para cualquier token en Monad (chain ID 143): operaciones en DEX y tokens en incubación estilo nad.fun, con emojis, umbrales e idioma configurables por grupo.\n\nExplorador: https://monadvision.com"
+}

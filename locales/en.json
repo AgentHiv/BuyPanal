@@ -1,0 +1,63 @@
+{
+  "welcome": "👋 Welcome to the Monad Buy Bot!\n\nTrack buys of any token on Monad — DEX-listed and incubation (bonding-curve) tokens — and get real-time alerts in this group.\n\nUse /help to see all commands.",
+  "help": "📖 Commands:\n/start — Welcome message and bot intro\n/help — Show this help\n/addtoken <address> — Track a token's buys in this group (admin)\n/removetoken <address> — Stop tracking a token (admin)\n/tokens — List tracked tokens\n/setemoji <emoji> — Set custom buy alert emoji (admin)\n/setwhaleemoji <emoji> — Set custom whale alert emoji (admin)\n/setlanguage <en|es|zh> — Set group language (admin)\n/setminbuy <MON> — Minimum buy amount to trigger alerts (admin)\n/setwhale <MON> — Whale alert threshold in MON (admin)\n/price [address] — Token price in MON/USD\n/mcap [address] — Token market cap\n/incubation [address] — Bonding-curve (incubation) progress\n/stats — 24h buy stats for this group\n/leaderboard — Top buyers in this group\n/settings — Show current group settings\n/about — About this bot",
+  "token": {
+    "added": "✅ Now tracking buys for {address} in this group.",
+    "exists": "ℹ️ {address} is already being tracked.",
+    "removed": "🗑️ Stopped tracking {address}.",
+    "not_found": "⚠️ {address} is not being tracked in this group.",
+    "list_empty": "No tokens tracked yet. Admins can add one with /addtoken <address>.",
+    "list_header": "📋 Tracked tokens ({count}):"
+  },
+  "settings": {
+    "updated": "✅ Settings updated.",
+    "show": "⚙️ Group settings:\nLanguage: {language}\nBuy emoji: {buy_emoji}\nWhale emoji: {whale_emoji}\nMin buy: {min_buy_mon} MON\nWhale threshold: {whale_mon} MON\nEmoji step: {emoji_step_mon} MON"
+  },
+  "language": {
+    "set": "🌐 Group language set to {language}.",
+    "invalid": "⚠️ Unsupported language. Available: {languages}"
+  },
+  "emoji": {
+    "set": "✅ Buy alert emoji set to {emoji}."
+  },
+  "minbuy": {
+    "set": "✅ Minimum buy alert amount set to {amount} MON."
+  },
+  "whale": {
+    "set": "✅ Whale alert threshold set to {amount} MON."
+  },
+  "buy": {
+    "title": "BUY",
+    "spent": "💸 Spent",
+    "received": "📦 Received",
+    "buyer": "👤 Buyer",
+    "price": "💲 Price",
+    "mcap": "🏦 Market Cap",
+    "incubation": "🧪 Incubation progress",
+    "whale": "🐋 WHALE ALERT!"
+  },
+  "price": {
+    "line": "{symbol}: {price_mon} MON ({price_usd})"
+  },
+  "error": {
+    "invalid_address": "⚠️ Invalid address: {address}",
+    "admin_only": "⛔ Only group admins can use this command.",
+    "generic": "❌ Something went wrong. Please try again later."
+  },
+  "incubation": {
+    "title": "🧪 Incubation — {symbol}",
+    "progress": "Progress: {progress}% ({mon_raised} MON raised)",
+    "graduated": "🎓 {symbol} has graduated from the bonding curve to a DEX!",
+    "not_incubating": "{symbol} is not currently incubating on a bonding curve."
+  },
+  "stats": {
+    "title": "📊 Buy stats for this group (24h)",
+    "line": "{symbol}: {count} buys · {volume_mon} MON ({volume_usd})"
+  },
+  "leaderboard": {
+    "title": "🏆 Top buyers in this group",
+    "row": "{rank}. {buyer} — {total_mon} MON",
+    "empty": "No buys recorded yet."
+  },
+  "about": "🤖 Monad Buy Bot\n\nReal-time buy alerts for any token on Monad (chain ID 143): DEX trades and nad.fun-style incubation tokens, with per-group emojis, thresholds and language.\n\nExplorer: https://monadvision.com"
+}
