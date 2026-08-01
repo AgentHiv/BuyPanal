@@ -1,0 +1,5 @@
+web3>=7
+python-telegram-bot>=21
+python-dotenv
+pytest
+pytest-asyncio
