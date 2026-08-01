@@ -51,7 +51,7 @@ def make_curve(**overrides) -> CurveInfo:
 
 @pytest.fixture(autouse=True)
 def inject_config():
-    config = Config()
+    config = Config(TELEGRAM_TOKEN="test-token")
     config.EXPLORER_URL = "https://monadvision.com"
     config.BUY_URL_TEMPLATE = "https://nad.fun/token/{token}"
     notifier.set_config(config)
