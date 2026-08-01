@@ -39,21 +39,27 @@ def _unknown(token_address: str) -> CurveInfo:
 
 
 async def _find_curve_address(w3: Any, token_address: str) -> Optional[str]:
-    """Address of the most recent curve emitting Buy events for the token."""
+    """Address of the most recent curve emitting Buy events for the token.
+
+    Scans newest-first in block windows (public RPCs reject large ranges)
+    and returns as soon as a curve Buy event is found.
+    """
     try:
+        from chain.client import iter_logs_windowed
+
         latest = int(await w3.eth.get_block_number())
         from_block = max(0, latest - _CURVE_SCAN_BLOCKS)
         token_topic = "0x" + "0" * 24 + token_address.lower().removeprefix("0x")
-        logs = await w3.eth.get_logs(
-            {
-                "fromBlock": from_block,
-                "toBlock": latest,
-                "topics": [CURVE_BUY_TOPIC, None, token_topic],
-            }
-        )
-        if not logs:
-            return None
-        return Web3.to_checksum_address(str(_get(logs[-1], "address")))
+        async for logs in iter_logs_windowed(
+            w3,
+            {"topics": [CURVE_BUY_TOPIC, None, token_topic]},
+            from_block,
+            latest,
+            max_windows=200,
+        ):
+            if logs:
+                return Web3.to_checksum_address(str(_get(logs[-1], "address")))
+        return None
     except Exception as exc:  # noqa: BLE001
         logger.debug("curve scan failed for %s: %s", token_address, exc)
         return None

@@ -19,10 +19,12 @@ from core.models import BuyEvent, SellEvent, TokenInfo
 from chain.abis import (
     CURVE_BUY_TOPIC,
     CURVE_SELL_TOPIC,
+    UNIV2_PAIR_ABI,
     UNIV2_SWAP_TOPIC,
     UNIV3_SWAP_TOPIC,
     ZERO_ADDRESS,
 )
+from chain.quotes import QuoteToken, get_quote_tokens, quote_leg_to_mon
 
 logger = logging.getLogger(__name__)
 
@@ -86,17 +88,80 @@ def _word_int(word: bytes) -> int:
     return value
 
 
-def _mon_usd(amount_mon: float) -> Optional[float]:
-    """USD value of a MON amount; None when no USD feed is configured."""
+def _mon_usd_price() -> float:
+    """Configured MON/USD price; 0.0 when unset or unreadable."""
     try:
         from core.config import load_config
 
-        mon_usd_price = float(load_config().MON_USD_PRICE or 0.0)
+        return float(load_config().MON_USD_PRICE or 0.0)
     except Exception:  # noqa: BLE001
-        mon_usd_price = 0.0
+        return 0.0
+
+
+def _mon_usd(amount_mon: float) -> Optional[float]:
+    """USD value of a MON amount; None when no USD feed is configured."""
+    mon_usd_price = _mon_usd_price()
     if mon_usd_price <= 0 or amount_mon <= 0:
         return None
     return amount_mon * mon_usd_price
+
+
+# ---------------------------------------------------------------------------
+# UniV2 pair quote-leg resolution (token0/token1, cached per pair address)
+# ---------------------------------------------------------------------------
+
+# pair_address.lower() -> (token0.lower(), token1.lower()) or None when the
+# pair could not be queried. TTL: infinite (pair tokens are immutable).
+_PAIR_TOKENS_CACHE: dict[str, Optional[tuple[str, str]]] = {}
+
+
+async def _pair_tokens(w3: Any, pair_address: str) -> Optional[tuple[str, str]]:
+    """(token0, token1) of a UniV2 pair, lowercase; None on any failure."""
+    key = str(pair_address or "").lower()
+    if not key:
+        return None
+    if key in _PAIR_TOKENS_CACHE:
+        return _PAIR_TOKENS_CACHE[key]
+    tokens: Optional[tuple[str, str]] = None
+    try:
+        from web3 import Web3
+
+        contract = w3.eth.contract(
+            address=Web3.to_checksum_address(key), abi=UNIV2_PAIR_ABI
+        )
+        token0 = await contract.functions.token0().call()
+        token1 = await contract.functions.token1().call()
+        if token0 and token1:
+            tokens = (str(token0).lower(), str(token1).lower())
+    except Exception as exc:  # noqa: BLE001 - fall back to heuristic
+        logger.debug("token0/token1 lookup failed for pair %s: %s", key, exc)
+    _PAIR_TOKENS_CACHE[key] = tokens
+    return tokens
+
+
+async def _quote_leg(
+    w3: Any, pair_address: str, token_address: str
+) -> Optional[tuple[int, QuoteToken]]:
+    """Index (0 or 1) of the known-quote leg of a UniV2 pair, plus the quote.
+
+    Returns None when the pair tokens cannot be read or neither leg is a
+    known quote token — callers then fall back to the legacy heuristic.
+    """
+    tokens = await _pair_tokens(w3, pair_address)
+    if tokens is None:
+        return None
+    quotes = get_quote_tokens()
+    token_lc = (token_address or "").lower()
+    # Prefer the leg that is NOT the tracked token (a tracked token may
+    # itself be a quote token, e.g. USDC in a USDC/WMON pair).
+    order = (0, 1)
+    if token_lc and tokens[0] == token_lc:
+        order = (1, 0)
+    for idx in order:
+        quote = quotes.get(tokens[idx])
+        if quote is not None:
+            return idx, quote
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -104,10 +169,12 @@ def _mon_usd(amount_mon: float) -> Optional[float]:
 # ---------------------------------------------------------------------------
 
 
-def _classify_swap_log(log: Any, token_address: str) -> Optional[dict]:
+async def _classify_swap_log(w3: Any, log: Any, token_address: str) -> Optional[dict]:
     """If log is a relevant swap/curve event, return decoded info, else None.
 
-    Returned dict: {"kind": "dex"|"curve", "emitter": str, "mon_in": float}
+    Returned dict: {"kind": "dex"|"curve", "emitter": str, "mon_in": float,
+    "usd_in": Optional[float]} where ``usd_in`` is set when the quote leg is
+    a known stablecoin (USD value known even without a MON/USD feed).
     """
     topics = _get(log, "topics") or []
     if not topics:
@@ -119,17 +186,26 @@ def _classify_swap_log(log: Any, token_address: str) -> Optional[dict]:
     if topic0 == UNIV2_SWAP_TOPIC and len(words) >= 4:
         amount0_in = _word_uint(words[0])
         amount1_in = _word_uint(words[1])
-        # Buy side: the input is the quote (WMON/MON). Heuristic: the larger
-        # input side is the MON leg of the swap (WMON has 18 decimals).
+        # Precise path: read the pair's token0/token1 to find the quote leg.
+        leg = await _quote_leg(w3, emitter, token_address)
+        if leg is not None:
+            idx, quote = leg
+            raw_quote = amount0_in if idx == 0 else amount1_in
+            mon_in, usd_in = quote_leg_to_mon(quote, raw_quote, _mon_usd_price())
+            if mon_in > 0.0 or usd_in is not None:
+                return {"kind": "dex", "emitter": emitter, "mon_in": mon_in, "usd_in": usd_in}
+            # Unpriced quote (e.g. WETH): fall through to the heuristic.
+        # Heuristic: the larger input side is the MON leg of the swap
+        # (WMON has 18 decimals).
         mon_in = max(amount0_in, amount1_in) / 1e18
-        return {"kind": "dex", "emitter": emitter, "mon_in": mon_in}
+        return {"kind": "dex", "emitter": emitter, "mon_in": mon_in, "usd_in": None}
 
     if topic0 == UNIV3_SWAP_TOPIC and len(words) >= 2:
         amount0 = _word_int(words[0])
         amount1 = _word_int(words[1])
         # Positive amount = tokens entering the pool = MON spent on a buy.
         mon_in = max(amount0, amount1, 0) / 1e18
-        return {"kind": "dex", "emitter": emitter, "mon_in": mon_in}
+        return {"kind": "dex", "emitter": emitter, "mon_in": mon_in, "usd_in": None}
 
     if topic0 == CURVE_BUY_TOPIC and len(words) >= 2:
         # Indexed arg 2 is the token; verify it matches the tracked token.
@@ -138,17 +214,18 @@ def _classify_swap_log(log: Any, token_address: str) -> Optional[dict]:
             if token_address and event_token != token_address.lower():
                 return None
         amount_in = _word_uint(words[0])  # MON/WMON spent
-        return {"kind": "curve", "emitter": emitter, "mon_in": amount_in / 1e18}
+        return {"kind": "curve", "emitter": emitter, "mon_in": amount_in / 1e18, "usd_in": None}
 
     return None
 
 
-def _classify_sell_swap_log(log: Any, token_address: str) -> Optional[dict]:
+async def _classify_sell_swap_log(w3: Any, log: Any, token_address: str) -> Optional[dict]:
     """Sell-side mirror of ``_classify_swap_log``.
 
-    Returned dict: {"kind": "dex"|"curve", "emitter": str, "mon_out": float}
-    where ``mon_out`` is the WMON/MON leg LEAVING the pair/pool/curve
-    (what the seller received).
+    Returned dict: {"kind": "dex"|"curve", "emitter": str, "mon_out": float,
+    "usd_out": Optional[float]} where ``mon_out`` is the quote leg LEAVING
+    the pair/pool/curve (what the seller received) and ``usd_out`` is set
+    when the quote leg is a known stablecoin.
     """
     topics = _get(log, "topics") or []
     if not topics:
@@ -160,17 +237,26 @@ def _classify_sell_swap_log(log: Any, token_address: str) -> Optional[dict]:
     if topic0 == UNIV2_SWAP_TOPIC and len(words) >= 4:
         amount0_out = _word_uint(words[2])
         amount1_out = _word_uint(words[3])
-        # Sell side: the output is the quote (WMON/MON). Heuristic mirrors
-        # the buy side: the larger output leg is the MON leg.
+        # Precise path: read the pair's token0/token1 to find the quote leg.
+        leg = await _quote_leg(w3, emitter, token_address)
+        if leg is not None:
+            idx, quote = leg
+            raw_quote = amount0_out if idx == 0 else amount1_out
+            mon_out, usd_out = quote_leg_to_mon(quote, raw_quote, _mon_usd_price())
+            if mon_out > 0.0 or usd_out is not None:
+                return {"kind": "dex", "emitter": emitter, "mon_out": mon_out, "usd_out": usd_out}
+            # Unpriced quote (e.g. WETH): fall through to the heuristic.
+        # Heuristic mirrors the buy side: the larger output leg is the
+        # MON leg.
         mon_out = max(amount0_out, amount1_out) / 1e18
-        return {"kind": "dex", "emitter": emitter, "mon_out": mon_out}
+        return {"kind": "dex", "emitter": emitter, "mon_out": mon_out, "usd_out": None}
 
     if topic0 == UNIV3_SWAP_TOPIC and len(words) >= 2:
         amount0 = _word_int(words[0])
         amount1 = _word_int(words[1])
         # Negative amount = tokens leaving the pool = MON received on a sell.
         mon_out = abs(min(amount0, amount1, 0)) / 1e18
-        return {"kind": "dex", "emitter": emitter, "mon_out": mon_out}
+        return {"kind": "dex", "emitter": emitter, "mon_out": mon_out, "usd_out": None}
 
     if topic0 == CURVE_SELL_TOPIC and len(words) >= 2:
         # Indexed arg 2 is the token; verify it matches the tracked token.
@@ -179,7 +265,7 @@ def _classify_sell_swap_log(log: Any, token_address: str) -> Optional[dict]:
             if token_address and event_token != token_address.lower():
                 return None
         amount_out = _word_uint(words[1])  # MON/WMON received
-        return {"kind": "curve", "emitter": emitter, "mon_out": amount_out / 1e18}
+        return {"kind": "curve", "emitter": emitter, "mon_out": amount_out / 1e18, "usd_out": None}
 
     return None
 
@@ -255,7 +341,7 @@ async def build_buy_event(w3, transfer_log, token_info: TokenInfo) -> BuyEvent |
         buy_candidate: Optional[dict] = None
         saw_sell = False
         for log in logs:
-            info = _classify_swap_log(log, token_address)
+            info = await _classify_swap_log(w3, log, token_address)
             if info is None:
                 continue
             if info["emitter"] == from_addr:
@@ -271,8 +357,10 @@ async def build_buy_event(w3, transfer_log, token_info: TokenInfo) -> BuyEvent |
             return None
 
         amount_mon = float(buy_candidate["mon_in"])
-        if amount_mon <= 0.0:
-            # Fallback: native MON value sent with the tx.
+        usd_in = buy_candidate.get("usd_in")
+        if amount_mon <= 0.0 and usd_in is None:
+            # Fallback: native MON value sent with the tx. Skipped when the
+            # quote leg is a stablecoin (tx.value would be misleading there).
             amount_mon = await _tx_value_mon(w3, tx_hash)
 
         price_mon = amount_mon / amount_token if amount_token > 0 and amount_mon > 0 else 0.0
@@ -285,7 +373,7 @@ async def build_buy_event(w3, transfer_log, token_info: TokenInfo) -> BuyEvent |
             buyer=to_addr,
             amount_token=amount_token,
             amount_mon=amount_mon,
-            amount_usd=_mon_usd(amount_mon),
+            amount_usd=usd_in if usd_in is not None else _mon_usd(amount_mon),
             price_mon=price_mon,
             tx_hash=_hex(tx_hash),
             pair_address=buy_candidate["emitter"],
@@ -342,7 +430,7 @@ async def build_sell_event(w3, transfer_log, token_info: TokenInfo) -> SellEvent
 
         sell_candidate: Optional[dict] = None
         for log in logs:
-            info = _classify_sell_swap_log(log, token_address)
+            info = await _classify_sell_swap_log(w3, log, token_address)
             if info is None:
                 continue
             if info["emitter"] == to_addr:
@@ -353,6 +441,7 @@ async def build_sell_event(w3, transfer_log, token_info: TokenInfo) -> SellEvent
             return None
 
         amount_mon = float(sell_candidate["mon_out"])  # 0.0 = unknown
+        usd_out = sell_candidate.get("usd_out")
         price_mon = amount_mon / amount_token if amount_token > 0 and amount_mon > 0 else 0.0
         timestamp = await _block_timestamp(w3, block_number)
 
@@ -363,7 +452,7 @@ async def build_sell_event(w3, transfer_log, token_info: TokenInfo) -> SellEvent
             buyer=from_addr,  # the seller
             amount_token=amount_token,
             amount_mon=amount_mon,
-            amount_usd=_mon_usd(amount_mon),
+            amount_usd=usd_out if usd_out is not None else _mon_usd(amount_mon),
             price_mon=price_mon,
             tx_hash=_hex(tx_hash),
             pair_address=sell_candidate["emitter"],

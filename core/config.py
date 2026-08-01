@@ -29,6 +29,7 @@ class Config:
     NAD_FUN_LENS: str = ""              # optional lens/factory address, "" if unused
     SCANNER_ENABLED: bool = True        # SPEC-v2: new-token scanner on/off
     PAIR_FACTORIES: str = ""            # SPEC-v2: comma-separated UniV2 factory addresses, "" = auto
+    QUOTE_TOKENS: str = ""              # extra quote tokens: CSV "SYMBOL:0xaddr" (extends built-in WMON/USDC/USDT0/WETH)
 
 
 def _get_float(name: str, default: float) -> float:
@@ -79,4 +80,5 @@ def load_config() -> Config:
         NAD_FUN_LENS=os.environ.get("NAD_FUN_LENS", ""),
         SCANNER_ENABLED=_get_bool("SCANNER_ENABLED", True),
         PAIR_FACTORIES=os.environ.get("PAIR_FACTORIES", ""),
+        QUOTE_TOKENS=os.environ.get("QUOTE_TOKENS", ""),
     )

@@ -62,3 +62,37 @@ async def ensure_connected(w3: AsyncWeb3) -> AsyncWeb3:
     except Exception:  # noqa: BLE001
         pass
     return await _get_w3_async()
+
+
+async def iter_logs_windowed(
+    w3: AsyncWeb3,
+    params: dict,
+    from_block: int,
+    to_block: int,
+    window: int = 50,
+    max_windows: int = 100,
+):
+    """Yield eth_getLogs results newest-first in block windows.
+
+    The public Monad RPC rejects large eth_getLogs ranges (HTTP 413), so
+    history is scanned in chunks of ``window`` blocks. On failure the
+    window is shrunk (down to a minimum) and retried; if it still fails
+    the scan stops silently. At most ``max_windows`` chunks are yielded.
+    """
+    span = max(1, window)
+    end = int(to_block)
+    yielded = 0
+    while end >= from_block and yielded < max_windows:
+        start = max(int(from_block), end - span + 1)
+        try:
+            logs = await w3.eth.get_logs({**params, "fromBlock": start, "toBlock": end})
+        except Exception as exc:  # noqa: BLE001 - shrink and retry
+            if span > 10:
+                span = max(10, span // 4)
+                continue
+            logger.debug("windowed get_logs failed at %s-%s: %s", start, end, exc)
+            return
+        yield logs
+        yielded += 1
+        end = start - 1
+        span = max(1, window)

@@ -246,7 +246,45 @@ CURVE_ABI = [
     },
 ]
 
+def _abi_signature(entry: dict) -> tuple:
+    """Collision key for an ABI entry (type, name, input types)."""
+    inputs = ",".join(i.get("type", "") for i in entry.get("inputs", []))
+    return (entry.get("type"), entry.get("name"), inputs)
+
+
+def combine_abis(*abis: list) -> list:
+    """Concatenate ABIs dropping duplicate function/event signatures.
+
+    web3 v7 rejects contract ABIs with colliding selectors, so a naive
+    ``ABI_A + ABI_B`` raises when both define e.g. ``getReserves()``.
+    """
+    seen: set = set()
+    combined: list = []
+    for abi in abis:
+        for entry in abi:
+            sig = _abi_signature(entry)
+            if sig in seen:
+                continue
+            seen.add(sig)
+            combined.append(entry)
+    return combined
+
+
+# UniV2 pair ABI extended with curve-only extras (reserves(), curve events),
+# safe to pass to w3.eth.contract.
+PAIR_OR_CURVE_ABI = combine_abis(UNIV2_PAIR_ABI, CURVE_ABI)
+
+
 # Wrapped MON on Monad mainnet (quote currency on DEX pairs).
 WMON_ADDRESS = "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A"
+
+# Well-known quote tokens on Monad mainnet (chain ID 143), verified on-chain
+# against https://rpc.monad.xyz (symbol()/decimals() calls):
+# - USDC:  symbol() -> "USDC",  decimals() -> 6  (native Circle USDC)
+# - USDT0: symbol() -> "USDT0", decimals() -> 6  (Tether USD, omnichain)
+# - WETH:  symbol() -> "WETH",  decimals() -> 18 (Monad official token list)
+USDC_ADDRESS = "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+USDT_ADDRESS = "0xe7cd86e13AC4309349F30B3435a9d337750fC82D"
+WETH_ADDRESS = "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242"
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
