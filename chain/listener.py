@@ -18,7 +18,7 @@ from web3 import Web3
 from chain.abis import TRANSFER_TOPIC
 from chain.client import ensure_connected, get_w3
 from chain.detector import _get, _hex
-from chain.detector import build_buy_event
+from chain.detector import build_buy_event, build_sell_event
 from chain.price import get_token_info
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ class BuyListener:
     def __init__(self, on_buy) -> None:
         """on_buy: async callable (chat_ids: list[int], buy: BuyEvent) -> None"""
         self._on_buy = on_buy
+        self._on_sell = None  # async callable (chat_ids: list[int], sell: SellEvent)
         self._tokens: set[str] = set()
         self._token_info: dict[str, Any] = {}
         self._chat_resolver: Optional[Callable[[str], list[int]]] = None
@@ -44,6 +45,14 @@ class BuyListener:
     def set_chat_resolver(self, fn: Callable[[str], list[int]]) -> None:
         """Set fn(address) -> list[int] mapping a token to subscribed chats."""
         self._chat_resolver = fn
+
+    def set_sell_callback(self, fn) -> None:
+        """Set fn(chat_ids: list[int], sell: SellEvent) for sell alerts.
+
+        The listener emits sells detected through the same Transfer-log
+        channel as buys (SPEC-v2 §9 listener contract).
+        """
+        self._on_sell = fn
 
     async def add_token(self, address: str) -> None:
         self._tokens.add(Web3.to_checksum_address(address))
@@ -134,15 +143,39 @@ class BuyListener:
 
         buy = await build_buy_event(self._w3, log, token_info)
         if buy is None:
+            if self._on_sell is not None:
+                await self._handle_sell(log, token_info, address)
             return
 
+        chat_ids = self._resolve_chats(address)
+        if not chat_ids:
+            return
+
+        await self._on_buy(chat_ids, buy)
+
+    def _resolve_chats(self, address: str) -> list[int]:
         chat_ids: list[int] = []
         if self._chat_resolver is not None:
             try:
                 chat_ids = list(self._chat_resolver(address) or [])
             except Exception as exc:  # noqa: BLE001
                 logger.warning("chat resolver failed for %s: %s", address, exc)
+        return chat_ids
+
+    async def _handle_sell(self, log: Any, token_info: Any, address: str) -> None:
+        try:
+            sell = await build_sell_event(self._w3, log, token_info)
+        except Exception as exc:  # noqa: BLE001 - sell path must never break buys
+            logger.warning("build_sell_event crashed for %s: %s", address, exc)
+            return
+        if sell is None:
+            return
+
+        chat_ids = self._resolve_chats(address)
         if not chat_ids:
             return
 
-        await self._on_buy(chat_ids, buy)
+        try:
+            await self._on_sell(chat_ids, sell)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("sell callback failed for %s: %s", address, exc)
