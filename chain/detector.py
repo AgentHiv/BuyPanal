@@ -208,10 +208,12 @@ async def _classify_swap_log(w3: Any, log: Any, token_address: str) -> Optional[
         return {"kind": "dex", "emitter": emitter, "mon_in": mon_in, "usd_in": None}
 
     if topic0 == CURVE_BUY_TOPIC and len(words) >= 2:
-        # Indexed arg 2 is the token; verify it matches the tracked token.
-        if len(topics) >= 3:
-            event_token = _topic_address(topics[2])
-            if token_address and event_token != token_address.lower():
+        # The token is an indexed arg; its position varies by deployment:
+        # real nad.fun curves index (token, to) — verified on-chain — while
+        # other deployments index (sender, token). Accept either position.
+        if token_address and len(topics) >= 3:
+            indexed = {_topic_address(t) for t in topics[1:3]}
+            if token_address.lower() not in indexed:
                 return None
         amount_in = _word_uint(words[0])  # MON/WMON spent
         return {"kind": "curve", "emitter": emitter, "mon_in": amount_in / 1e18, "usd_in": None}
@@ -259,10 +261,10 @@ async def _classify_sell_swap_log(w3: Any, log: Any, token_address: str) -> Opti
         return {"kind": "dex", "emitter": emitter, "mon_out": mon_out, "usd_out": None}
 
     if topic0 == CURVE_SELL_TOPIC and len(words) >= 2:
-        # Indexed arg 2 is the token; verify it matches the tracked token.
-        if len(topics) >= 3:
-            event_token = _topic_address(topics[2])
-            if token_address and event_token != token_address.lower():
+        # Same indexed-token tolerance as the buy side (see above).
+        if token_address and len(topics) >= 3:
+            indexed = {_topic_address(t) for t in topics[1:3]}
+            if token_address.lower() not in indexed:
                 return None
         amount_out = _word_uint(words[1])  # MON/WMON received
         return {"kind": "curve", "emitter": emitter, "mon_out": amount_out / 1e18, "usd_out": None}

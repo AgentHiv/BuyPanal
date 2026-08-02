@@ -157,7 +157,11 @@ class BuyListener:
         chat_ids: list[int] = []
         if self._chat_resolver is not None:
             try:
+                # Resolvers may key by lowercase (db storage) or checksum;
+                # try the address as-is first, then normalized.
                 chat_ids = list(self._chat_resolver(address) or [])
+                if not chat_ids:
+                    chat_ids = list(self._chat_resolver(str(address).lower()) or [])
             except Exception as exc:  # noqa: BLE001
                 logger.warning("chat resolver failed for %s: %s", address, exc)
         return chat_ids

@@ -127,7 +127,8 @@ def run() -> None:
                 logger.exception("failed to notify chat %s", chat_id)
 
     listener = BuyListener(on_event)
-    listener.set_chat_resolver(lambda address: db.all_tracked_tokens().get(address, []))
+    # db keys are lowercase (_norm); the listener passes checksum addresses
+    listener.set_chat_resolver(lambda address: db.all_tracked_tokens().get(str(address).lower(), []))
     set_sell_callback = getattr(listener, "set_sell_callback", None)
     if callable(set_sell_callback):
         set_sell_callback(on_event)

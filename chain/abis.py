@@ -19,9 +19,21 @@ from web3 import Web3
 ERC20_TRANSFER_SIG = "Transfer(address,address,uint256)"
 UNIV2_SWAP_SIG = "Swap(address,uint256,uint256,uint256,uint256,address)"
 UNIV3_SWAP_SIG = "Swap(address,address,int256,int256,uint160,uint128,int24)"
+# nad.fun-style curve events. NOTE: the indexed-arg ORDER varies by
+# deployment — the real nad.fun curve on Monad mainnet indexes
+# (token, to), not (sender, token). Verified on-chain (chain ID 143), e.g.
+# curve 0x9f3832732923252A21044F21eE6bd87F09514ae4, tx
+# 0xa0e07386173ad893a6c29df301b362fb5aace080517bb0fad0d046eda8612d03:
+#   Buy  topics = [sig, token, buyer],   data = (monIn, tokenOut)
+#   Sell topics = [sig, token, seller],  data = (tokenIn, monOut)
 CURVE_BUY_SIG = "Buy(address,address,uint256,uint256)"
 CURVE_SELL_SIG = "Sell(address,address,uint256,uint256)"
 CURVE_SYNC_SIG = "Sync(uint256,uint256)"
+# Real Sync emitted by nad.fun curve clones (no getReserves()/reserves()
+# getters exist on the EIP-1167 clones, so reserves come from this event):
+#   Sync(address indexed token, uint256 vMon, uint256 realToken,
+#        uint256 realMon, uint256 vToken)
+CURVE_SYNC_FULL_SIG = "Sync(address,uint256,uint256,uint256,uint256)"
 
 
 def event_topic(signature: str) -> str:
@@ -36,6 +48,7 @@ UNIV3_SWAP_TOPIC = event_topic(UNIV3_SWAP_SIG)
 CURVE_BUY_TOPIC = event_topic(CURVE_BUY_SIG)
 CURVE_SELL_TOPIC = event_topic(CURVE_SELL_SIG)
 CURVE_SYNC_TOPIC = event_topic(CURVE_SYNC_SIG)
+CURVE_SYNC_FULL_TOPIC = event_topic(CURVE_SYNC_FULL_SIG)
 
 # ---------------------------------------------------------------------------
 # Minimal ABIs

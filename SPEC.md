@@ -16,7 +16,7 @@ A Telegram buy-alert bot (BuyBotTech-style) for the **Monad** blockchain (EVM-co
 - Monad is fully EVM-compatible → use standard `web3.py` tooling.
 - DEXs on Monad: PancakeSwap v2/v3, Uniswap v3, Kuru (all standard EVM event signatures).
 - nad.fun-style launchpads: token trades on a **bonding curve** ("incubation") until graduation (~225,000 MON raised, ~80% supply sold), then liquidity moves to a DEX.
-- Curve `Buy` event signature: `Buy(address indexed sender, address indexed token, uint256 amountIn, uint256 amountOut)` where `amountIn` is WMON/MON spent.
+- Curve `Buy` event signature: `Buy(address,address,uint256,uint256)` with `amountIn` = WMON/MON spent. The indexed-arg order varies by deployment: the real nad.fun curve on Monad mainnet indexes **(token, to)** (verified on-chain), others index (sender, token) — the detector accepts either position. Same for `Sell` (data = tokenIn, monOut). Curve clones expose no reserve getters; reserves are decoded from `Sync(address indexed token, uint256 vMon, uint256 realToken, uint256 realMon, uint256 vToken)`.
 - WMON (wrapped MON) is the quote currency on DEX pairs.
 
 ## 3. Tech Stack

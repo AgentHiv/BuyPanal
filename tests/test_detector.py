@@ -8,6 +8,7 @@ from core.models import TokenInfo
 
 from chain.abis import (
     CURVE_BUY_TOPIC,
+    CURVE_SELL_TOPIC,
     TRANSFER_TOPIC,
     UNIV2_SWAP_TOPIC,
     USDC_ADDRESS,
@@ -65,6 +66,30 @@ def curve_buy_log(curve: str, token: str, amount_in: int, amount_out: int) -> di
     return {
         "address": curve,
         "topics": [CURVE_BUY_TOPIC, pad_addr(BUYER), pad_addr(token)],
+        "data": words(amount_in, amount_out),
+        "transactionHash": TX_HASH,
+        "blockNumber": BLOCK_NUMBER,
+        "logIndex": 1,
+    }
+
+
+def curve_buy_log_token_first(curve: str, token: str, amount_in: int, amount_out: int) -> dict:
+    """Real nad.fun layout: indexed (token, to); data = (monIn, tokenOut)."""
+    return {
+        "address": curve,
+        "topics": [CURVE_BUY_TOPIC, pad_addr(token), pad_addr(BUYER)],
+        "data": words(amount_in, amount_out),
+        "transactionHash": TX_HASH,
+        "blockNumber": BLOCK_NUMBER,
+        "logIndex": 1,
+    }
+
+
+def curve_sell_log_token_first(curve: str, token: str, amount_in: int, amount_out: int) -> dict:
+    """Real nad.fun sell: indexed (token, seller); data = (tokenIn, monOut)."""
+    return {
+        "address": curve,
+        "topics": [CURVE_SELL_TOPIC, pad_addr(token), pad_addr(SELLER)],
         "data": words(amount_in, amount_out),
         "transactionHash": TX_HASH,
         "blockNumber": BLOCK_NUMBER,
@@ -258,6 +283,65 @@ async def test_curve_buy_wrong_token_returns_none(token_info):
     w3 = FakeW3(receipt=receipt)
     buy = await build_buy_event(w3, transfer_log(CURVE, BUYER, 2000 * E18), token_info)
     assert buy is None
+
+
+@pytest.mark.asyncio
+async def test_curve_buy_token_first_layout(token_info):
+    """nad.fun real layout (indexed token in topic1) must also match.
+
+    Regression: on-chain nad.fun curves index (token, to), not
+    (sender, token) — e.g. tx 0xa0e07386... on Monad mainnet.
+    """
+    receipt = {
+        "logs": [
+            curve_buy_log_token_first(CURVE, TOKEN, 10 * E18, 2000 * E18),
+            transfer_log(CURVE, BUYER, 2000 * E18),
+        ]
+    }
+    w3 = FakeW3(receipt=receipt)
+    buy = await build_buy_event(w3, transfer_log(CURVE, BUYER, 2000 * E18), token_info)
+
+    assert buy is not None
+    assert buy.kind == "curve"
+    assert buy.pair_address == CURVE
+    assert buy.amount_mon == pytest.approx(10.0)
+    assert buy.amount_token == pytest.approx(2000.0)
+    assert buy.price_mon == pytest.approx(10.0 / 2000.0)
+
+
+@pytest.mark.asyncio
+async def test_curve_buy_token_first_wrong_token_returns_none(token_info):
+    """Token-first layout for a DIFFERENT token must not match -> None."""
+    other_token = "0x" + "99" * 20
+    receipt = {
+        "logs": [
+            curve_buy_log_token_first(CURVE, other_token, 10 * E18, 2000 * E18),
+            transfer_log(CURVE, BUYER, 2000 * E18),
+        ]
+    }
+    w3 = FakeW3(receipt=receipt)
+    buy = await build_buy_event(w3, transfer_log(CURVE, BUYER, 2000 * E18), token_info)
+    assert buy is None
+
+
+@pytest.mark.asyncio
+async def test_curve_sell_token_first_layout(token_info):
+    """nad.fun real sell layout: indexed (token, seller); (tokenIn, monOut)."""
+    receipt = {
+        "logs": [
+            curve_sell_log_token_first(CURVE, TOKEN, 2000 * E18, 10 * E18),
+            transfer_log(SELLER, CURVE, 2000 * E18),
+        ]
+    }
+    w3 = FakeW3(receipt=receipt)
+    sell = await build_sell_event(w3, transfer_log(SELLER, CURVE, 2000 * E18), token_info)
+
+    assert sell is not None
+    assert sell.kind == "curve"
+    assert sell.pair_address == CURVE
+    assert sell.amount_mon == pytest.approx(10.0)  # monOut from the Sell event
+    assert sell.amount_token == pytest.approx(2000.0)
+    assert sell.price_mon == pytest.approx(10.0 / 2000.0)
 
 
 @pytest.mark.asyncio

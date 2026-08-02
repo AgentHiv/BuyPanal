@@ -42,7 +42,9 @@ async def _find_curve_address(w3: Any, token_address: str) -> Optional[str]:
     """Address of the most recent curve emitting Buy events for the token.
 
     Scans newest-first in block windows (public RPCs reject large ranges)
-    and returns as soon as a curve Buy event is found.
+    and returns as soon as a curve Buy event is found. The token is an
+    indexed arg whose position varies by deployment — real nad.fun curves
+    put it in topic1, others in topic2 — so both layouts are scanned.
     """
     try:
         from chain.client import iter_logs_windowed
@@ -50,22 +52,57 @@ async def _find_curve_address(w3: Any, token_address: str) -> Optional[str]:
         latest = int(await w3.eth.get_block_number())
         from_block = max(0, latest - _CURVE_SCAN_BLOCKS)
         token_topic = "0x" + "0" * 24 + token_address.lower().removeprefix("0x")
-        async for logs in iter_logs_windowed(
-            w3,
-            {"topics": [CURVE_BUY_TOPIC, None, token_topic]},
-            from_block,
-            latest,
-            max_windows=200,
-        ):
-            if logs:
-                return Web3.to_checksum_address(str(_get(logs[-1], "address")))
+        for topics in ([CURVE_BUY_TOPIC, token_topic], [CURVE_BUY_TOPIC, None, token_topic]):
+            async for logs in iter_logs_windowed(
+                w3,
+                {"topics": topics},
+                from_block,
+                latest,
+                max_windows=200,
+            ):
+                if logs:
+                    return Web3.to_checksum_address(str(_get(logs[-1], "address")))
         return None
     except Exception as exc:  # noqa: BLE001
         logger.debug("curve scan failed for %s: %s", token_address, exc)
         return None
 
 
-async def _curve_reserves(w3: Any, curve_address: str) -> Optional[tuple[float, float]]:
+async def _latest_sync_reserves(
+    w3: Any, curve_address: str, token_address: str
+) -> Optional[tuple[float, float]]:
+    """(mon_reserve, token_reserve) from the curve's latest Sync event.
+
+    nad.fun curve clones expose no getReserves()/reserves() getters, so the
+    real reserves are decoded from ``Sync(address,uint256,uint256,uint256,
+    uint256)``: word1 = real token reserve, word2 = real MON reserve (the
+    other two words are the virtual offsets; real reserves are what the
+    curve prices at — verified against on-chain trade execution prices).
+    """
+    try:
+        from chain.abis import CURVE_SYNC_FULL_TOPIC
+        from chain.client import iter_logs_windowed
+
+        latest = int(await w3.eth.get_block_number())
+        token_topic = "0x" + "0" * 24 + token_address.lower().removeprefix("0x")
+        params = {"address": curve_address, "topics": [CURVE_SYNC_FULL_TOPIC, token_topic]}
+        async for logs in iter_logs_windowed(w3, params, 0, latest, max_windows=200):
+            if not logs:
+                continue
+            data = _get(logs[-1], "data", b"") or b""
+            raw = bytes(data) if isinstance(data, (bytes, bytearray)) else bytes.fromhex(str(data).removeprefix("0x"))
+            words = [int.from_bytes(raw[i : i + 32], "big") for i in range(0, len(raw), 32)]
+            if len(words) >= 3:
+                return words[2] / 1e18, words[1] / 1e18
+        return None
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("curve Sync scan failed for %s: %s", token_address, exc)
+        return None
+
+
+async def _curve_reserves(
+    w3: Any, curve_address: str, token_address: Optional[str] = None
+) -> Optional[tuple[float, float]]:
     """(mon_reserve, token_reserve) in human units, or None."""
     curve = w3.eth.contract(address=curve_address, abi=CURVE_ABI)
     try:  # getReserves() UniV2-style
@@ -82,6 +119,8 @@ async def _curve_reserves(w3: Any, curve_address: str) -> Optional[tuple[float, 
             return r_mon / 1e18, r_token / 1e18
     except Exception:  # noqa: BLE001
         pass
+    if token_address:  # nad.fun clones: decode the latest Sync event
+        return await _latest_sync_reserves(w3, curve_address, token_address)
     return None
 
 
@@ -103,7 +142,7 @@ async def get_curve_info(token_address: str) -> CurveInfo:
         if curve_address is None:
             return _unknown(token_address)
 
-        reserves = await _curve_reserves(w3, curve_address)
+        reserves = await _curve_reserves(w3, curve_address, token_address)
         mon_raised: Optional[float] = None
         progress: Optional[float] = None
         graduated = False

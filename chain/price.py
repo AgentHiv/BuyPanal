@@ -232,7 +232,7 @@ async def get_price_mon(address: str) -> float:
 
             curve_address = await _find_curve_address(w3, token_address)
             if curve_address is not None:
-                reserves = await _curve_reserves(w3, curve_address)
+                reserves = await _curve_reserves(w3, curve_address, token_address)
                 if reserves is not None:
                     mon_reserve, token_reserve = reserves
                     if token_reserve > 0 and mon_reserve > 0:
