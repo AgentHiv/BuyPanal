@@ -138,10 +138,9 @@ async def test_emoji_repeat_count(bot):
     settings = make_settings(buy_emoji="🟢", emoji_step_usdt=10.0, whale_usdt=10000.0)
     await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_usd=45.0), None)
     text = sent_text(bot)
-    first_line = text.splitlines()[0]
-    # int(45 / 10) == 4 -> four emojis on each side of the title
-    assert "🟢🟢🟢🟢" in first_line
-    assert "🟢🟢🟢🟢🟢" not in first_line
+    emoji_line = text.splitlines()[1]
+    # int(45 / 10) == 4 -> four emojis on the line below the title
+    assert emoji_line == "🟢🟢🟢🟢"
 
 
 @pytest.mark.asyncio
@@ -151,7 +150,7 @@ async def test_emoji_repeat_minimum_one(bot):
         bot, 123, settings, make_buy(amount_mon=0.0, amount_usd=None), None
     )
     text = sent_text(bot)
-    assert text.splitlines()[0].startswith("🟢 ")
+    assert text.splitlines()[1] == "🟢"
 
 
 @pytest.mark.asyncio
@@ -159,9 +158,8 @@ async def test_emoji_repeat_capped_at_20(bot):
     settings = make_settings(buy_emoji="🟢", emoji_step_usdt=10.0, whale_usdt=100000.0)
     await notifier.send_buy_alert(bot, 123, settings, make_buy(amount_usd=5000.0), None)
     text = sent_text(bot)
-    first_line = text.splitlines()[0]
-    assert first_line.startswith("🟢" * 20 + " ")
-    assert "🟢" * 21 not in first_line
+    emoji_line = text.splitlines()[1]
+    assert emoji_line == "🟢" * 20
 
 
 @pytest.mark.asyncio
@@ -213,3 +211,63 @@ async def test_usd_line_hidden_when_no_usd_feed(bot):
     text = sent_text(bot)
     spent_line = next(ln for ln in text.splitlines() if "50.00 MON" in ln)
     assert "($" not in spent_line
+
+
+@pytest.mark.asyncio
+async def test_price_line_in_usdt_when_rate_available(bot):
+    settings = make_settings()
+    await notifier.send_buy_alert(
+        bot, 123, settings, make_buy(price_mon=0.5), None, mon_usd=2.0
+    )
+    price_line = next(ln for ln in sent_text(bot).splitlines() if "Price" in ln)
+    assert "1.00 USDT" in price_line  # 0.5 MON * 2.0 USD/MON
+    assert "0.50 MON" in price_line
+
+
+@pytest.mark.asyncio
+async def test_price_line_mon_only_without_rate(bot):
+    settings = make_settings()
+    await notifier.send_buy_alert(bot, 123, settings, make_buy(price_mon=0.5), None)
+    price_line = next(ln for ln in sent_text(bot).splitlines() if "Price" in ln)
+    assert "USDT" not in price_line
+    assert price_line.endswith("0.50 MON")
+
+
+@pytest.mark.asyncio
+async def test_mcap_line_usdt_when_rate_available(bot):
+    settings = make_settings()
+    await notifier.send_buy_alert(
+        bot, 123, settings, make_buy(), None, mon_usd=2.0, mcap_mon=1000.0
+    )
+    assert "Market Cap: 2,000.00 USDT (≈ 1,000.00 MON)" in sent_text(bot)
+
+
+@pytest.mark.asyncio
+async def test_mcap_line_mon_only_without_rate(bot):
+    settings = make_settings()
+    await notifier.send_buy_alert(
+        bot, 123, settings, make_buy(), None, mcap_mon=1000.0
+    )
+    text = sent_text(bot)
+    assert "Market Cap: 1,000.00 MON" in text
+    assert "USDT (≈" not in next(ln for ln in text.splitlines() if "Market Cap" in ln)
+
+
+@pytest.mark.asyncio
+async def test_mcap_line_absent_when_unknown(bot):
+    settings = make_settings()
+    await notifier.send_buy_alert(bot, 123, settings, make_buy(), None, mon_usd=2.0)
+    assert "Market Cap" not in sent_text(bot)
+
+
+@pytest.mark.asyncio
+async def test_new_buyer_line_only_for_first_time_buyers(bot):
+    settings = make_settings()
+    await notifier.send_buy_alert(
+        bot, 123, settings, make_buy(), None, is_new_buyer=True
+    )
+    assert "New buyer" in sent_text(bot)
+
+    bot.reset_mock()
+    await notifier.send_buy_alert(bot, 123, settings, make_buy(), None)
+    assert "New buyer" not in sent_text(bot)

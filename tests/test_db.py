@@ -240,3 +240,23 @@ class TestTopBuyers:
     def test_per_chat_isolation(self, db):
         db.record_buy(CHAT, make_buy(buyer="0xA", amount_mon=5.0, tx_hash="0x1"))
         assert db.get_top_buyers(OTHER_CHAT) == []
+
+
+# ------------------------------------------------------- has_bought_before
+class TestHasBoughtBefore:
+    def test_false_when_no_buys(self, db):
+        assert db.has_bought_before(CHAT, TOKEN_A, "0xBuyer1") is False
+
+    def test_true_after_record_buy(self, db):
+        db.record_buy(CHAT, make_buy(buyer="0xBuyer1", tx_hash="0x1"))
+        assert db.has_bought_before(CHAT, TOKEN_A, "0xBuyer1") is True
+
+    def test_buyer_match_is_case_insensitive(self, db):
+        db.record_buy(CHAT, make_buy(buyer="0xAbCdEf", tx_hash="0x1"))
+        assert db.has_bought_before(CHAT, TOKEN_A, "0xABCDEF") is True
+
+    def test_scoped_to_chat_and_token(self, db):
+        db.record_buy(CHAT, make_buy(token=TOKEN_A, buyer="0xBuyer1", tx_hash="0x1"))
+        assert db.has_bought_before(OTHER_CHAT, TOKEN_A, "0xBuyer1") is False
+        assert db.has_bought_before(CHAT, TOKEN_B, "0xBuyer1") is False
+        assert db.has_bought_before(CHAT, TOKEN_A, "0xOther") is False

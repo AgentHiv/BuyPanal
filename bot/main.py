@@ -18,6 +18,7 @@ from telegram.ext import Application, CommandHandler
 
 from chain.incubation import get_curve_info
 from chain.listener import BuyListener
+from chain.price import get_mcap_mon
 from core.config import load_config
 from core.db import Database
 from core.i18n import t
@@ -108,6 +109,12 @@ def run() -> None:
                 curve = await get_curve_info(event.token_address)
             except Exception:
                 logger.exception("get_curve_info failed for %s", event.token_address)
+        mcap_mon = 0.0
+        if not is_sell:
+            try:
+                mcap_mon = await get_mcap_mon(event.token_address)
+            except Exception:
+                logger.exception("get_mcap_mon failed for %s", event.token_address)
         for chat_id in chat_ids:
             try:
                 settings = db.get_settings(chat_id)
@@ -121,8 +128,15 @@ def run() -> None:
                         continue
                     await send_sell(app.bot, chat_id, settings, event, curve, mon_usd=mon_usd)
                 else:
+                    # check before record_buy so the current buy doesn't count
+                    is_new_buyer = not db.has_bought_before(
+                        chat_id, event.token_address, event.buyer
+                    )
                     db.record_buy(chat_id, event)
-                    await notifier.send_buy_alert(app.bot, chat_id, settings, event, curve, mon_usd=mon_usd)
+                    await notifier.send_buy_alert(
+                        app.bot, chat_id, settings, event, curve,
+                        mon_usd=mon_usd, mcap_mon=mcap_mon, is_new_buyer=is_new_buyer,
+                    )
             except Exception:
                 logger.exception("failed to notify chat %s", chat_id)
 

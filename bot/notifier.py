@@ -5,10 +5,13 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from telegram import MessageEntity
+
 from core.config import Config, load_config
 from core.i18n import t
 from core.models import BuyEvent, CurveInfo, GroupSettings, SellEvent
 
+from bot import emojis
 from bot.keyboards import buy_alert_keyboard
 
 logger = logging.getLogger(__name__)
@@ -40,10 +43,46 @@ def _fmt_num(value: float) -> str:
     return text
 
 
+def _fmt_price(value: float) -> str:
+    """Unit price: fixed 2 decimals for normal prices; tiny prices
+    (< 0.01) keep their trimmed precision so they don't print as "0.00"."""
+    if value == 0:
+        return "0"
+    if abs(value) >= 0.01:
+        return f"{value:,.2f}"
+    return _fmt_num(value)
+
+
 def _short_addr(address: str) -> str:
     if len(address) > 13:
         return f"{address[:6]}…{address[-4:]}"
     return address
+
+
+def _emoji_line(emoji_value: str, count: int, prefix: str) -> "tuple[str, list]":
+    """Emoji line text + custom-emoji entities for it.
+
+    ``prefix`` is the message text preceding the emoji line (title + "\\n"),
+    used to compute UTF-16 entity offsets. Regular Unicode emojis produce
+    no entities; an encoded custom emoji (``tg:<id>:<fallback>``) renders
+    the fallback ``count`` times with one custom_emoji entity each.
+    """
+    decoded = emojis.decode_custom_emoji(emoji_value)
+    if decoded is None:
+        return emoji_value * count, []
+    custom_id, fallback = decoded
+    start = emojis.utf16_len(prefix)
+    unit = emojis.utf16_len(fallback)
+    entities = [
+        MessageEntity(
+            type=MessageEntity.CUSTOM_EMOJI,
+            offset=start + i * unit,
+            length=unit,
+            custom_emoji_id=custom_id,
+        )
+        for i in range(count)
+    ]
+    return fallback * count, entities
 
 
 def buy_value_usd(
@@ -68,6 +107,8 @@ async def send_buy_alert(
     buy: BuyEvent,
     curve: CurveInfo | None,
     mon_usd: float = 0.0,
+    mcap_mon: float = 0.0,
+    is_new_buyer: bool = False,
 ) -> None:
     """Format and send a buy alert to a chat (SPEC-v3 §4: USDT thresholds).
 
@@ -78,7 +119,14 @@ async def send_buy_alert(
       the alert is sent anyway, with no whale line and a single emoji.
     - The spent line shows USDT first (MON in parentheses); MON only when
       there is no USD value.
-    - ``mon_usd`` is an optional kwarg: v2 callers (no kwarg) keep working.
+    - The price line shows USDT first (MON in parentheses) when a MON/USD
+      rate is available; MON only otherwise.
+    - ``mcap_mon`` (token market cap in MON, 0.0 = unknown) adds a market-cap
+      line, in USDT when a MON/USD rate is available.
+    - ``is_new_buyer`` adds a "new buyer" line (first buy of this token in
+      this group).
+    - ``mon_usd``, ``mcap_mon`` and ``is_new_buyer`` are optional kwargs:
+      v2 callers (no kwargs) keep working.
     - Incubation line only when curve.is_incubating.
     """
     lang = settings.language
@@ -96,11 +144,13 @@ async def send_buy_alert(
         count = min(20, max(1, int(usd / step)))
     else:
         count = 1
-    emojis = emoji * count
+
+    title = f"{t(lang, 'buy.title')} | {buy.token_name} (${buy.token_symbol})"
+    emoji_text, entities = _emoji_line(emoji, count, title + "\n")
 
     lines = [
-        f"{emojis} {t(lang, 'buy.title')} | "
-        f"{buy.token_name} (${buy.token_symbol}) {emojis}"
+        title,
+        emoji_text,
     ]
 
     if usd > 0.0:
@@ -114,7 +164,30 @@ async def send_buy_alert(
         f"{t(lang, 'buy.received')}: {_fmt_num(buy.amount_token)} {buy.token_symbol}"
     )
     lines.append(f"{t(lang, 'buy.buyer')}: {_short_addr(buy.buyer)}")
-    lines.append(f"{t(lang, 'buy.price')}: {_fmt_num(buy.price_mon)} MON")
+    if is_new_buyer:
+        lines.append(t(lang, "buy.new_buyer"))
+
+    if usd > 0.0 and mon_usd > 0 and buy.price_mon > 0:
+        price_usd = buy.price_mon * mon_usd
+        lines.append(
+            f"{t(lang, 'buy.price')}: {_fmt_price(price_usd)} USDT "
+            f"(≈ {_fmt_price(buy.price_mon)} MON)"
+        )
+    else:
+        lines.append(f"{t(lang, 'buy.price')}: {_fmt_price(buy.price_mon)} MON")
+
+    if mcap_mon > 0:
+        if mon_usd > 0:
+            lines.append(
+                t(
+                    lang,
+                    "buy.mcap",
+                    mcap_usd=_fmt_num(mcap_mon * mon_usd),
+                    mcap_mon=_fmt_num(mcap_mon),
+                )
+            )
+        else:
+            lines.append(t(lang, "buy.mcap_mon", mcap_mon=_fmt_num(mcap_mon)))
 
     if curve is not None and curve.is_incubating:
         pct = f"{curve.progress_pct:.0f}%" if curve.progress_pct is not None else "?%"
@@ -132,6 +205,7 @@ async def send_buy_alert(
             text=text,
             reply_markup=keyboard,
             disable_web_page_preview=True,
+            entities=entities or None,
         )
     except Exception:
         logger.exception("failed to send buy alert to chat %s", chat_id)
@@ -166,11 +240,13 @@ async def send_sell_alert(
         count = min(20, max(1, int(usd / step)))
     else:
         count = 1
-    emojis = settings.sell_emoji * count
+
+    title = f"{t(lang, 'sell.title')} | {sell.token_name} (${sell.token_symbol})"
+    emoji_text, entities = _emoji_line(settings.sell_emoji, count, title + "\n")
 
     lines = [
-        f"{emojis} {t(lang, 'sell.title')} | "
-        f"{sell.token_name} (${sell.token_symbol}) {emojis}"
+        title,
+        emoji_text,
     ]
 
     if usd > 0.0:
@@ -184,7 +260,7 @@ async def send_sell_alert(
         f"{t(lang, 'sell.sold')}: {_fmt_num(sell.amount_token)} {sell.token_symbol}"
     )
     lines.append(f"{t(lang, 'sell.seller')}: {_short_addr(sell.buyer)}")
-    lines.append(f"{t(lang, 'buy.price')}: {_fmt_num(sell.price_mon)} MON")
+    lines.append(f"{t(lang, 'buy.price')}: {_fmt_price(sell.price_mon)} MON")
 
     if curve is not None and curve.is_incubating:
         pct = f"{curve.progress_pct:.0f}%" if curve.progress_pct is not None else "?%"
@@ -199,6 +275,7 @@ async def send_sell_alert(
             text=text,
             reply_markup=keyboard,
             disable_web_page_preview=True,
+            entities=entities or None,
         )
     except Exception:
         logger.exception("failed to send sell alert to chat %s", chat_id)

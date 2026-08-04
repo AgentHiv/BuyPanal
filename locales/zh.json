@@ -1,24 +1,24 @@
 {
-  "welcome": "👋 欢迎使用 Monad 买入提醒机器人！\n\n追踪 Monad 上任意代币的买入——包括 DEX 已上线代币和孵化期（联合曲线）代币——并在本群实时接收提醒。\n\n使用 /help 查看所有命令。",
-  "help": "📖 命令列表：\n/start — 欢迎消息与机器人介绍\n/help — 显示本帮助\n/setup — 引导式设置：三步追踪代币（管理员）\n/addtoken <address> — 在本群追踪某代币的买入（管理员）\n/removetoken <address> — 停止追踪某代币（管理员）\n/tokens — 列出已追踪的代币\n/setemoji <emoji> — 设置自定义买入提醒表情（管理员）\n/setwhaleemoji <emoji> — 设置自定义巨鲸提醒表情（管理员）\n/setlanguage <en|es|zh> — 设置群组语言（管理员）\n/setminbuy <USDT> — 触发提醒的最小买入金额（USDT）（管理员）\n/setwhale <USDT> — 巨鲸提醒阈值（USDT）（管理员）\n/price [address] — 代币价格（MON/USD）\n/mcap [address] — 代币市值\n/incubation [address] — 联合曲线（孵化）进度\n/stats — 本群 24 小时买入统计\n/leaderboard — 本群买入排行榜\n/settings — 查看当前群组设置\n/about — 关于本机器人",
+  "welcome": "👋 欢迎使用 Monad Buy Bot —— Monad 生态实时买入提醒机器人。\n\n追踪 Monad（链 ID 143）上的任意代币：\n• 💱 已上线 DEX 的代币\n• 🧪 联合曲线孵化期代币\n\n提醒实时推送至本群，并支持按群组全面自定义：表情、最低金额、巨鲸阈值和语言。\n\n使用 /help 查看全部命令，或点击 ⚙️ 设置，用按钮完成所有配置。",
+  "help": "📖 命令一览\n\n🔹 追踪\n/setup — 引导式设置：三步追踪代币（管理员）\n/addtoken <address> — 追踪某代币的买入（管理员）\n/removetoken <address> — 停止追踪某代币（管理员）\n/tokens — 列出已追踪的代币\n\n🔹 行情数据\n/price [address] — 代币价格（MON/USD）\n/mcap [address] — 代币市值\n/incubation [address] — 联合曲线进度\n/tokeninfo [address] — 代币卡片：流动性、持有者、孵化状态\n/stats — 本群 24 小时买入统计\n/leaderboard — 本群买入排行榜\n/dashboard — 实时自动刷新的统计面板\n\n🔹 提醒\n/pricealert <address> <above|below> <USDT> — 创建价格提醒\n/alerts — 管理您的价格提醒\n/sells — 开关卖出提醒\n/scanner — 开关新孵化代币提醒\n\n🔹 配置（管理员）\n/setemoji <emoji> — 买入提醒表情\n/setwhaleemoji <emoji> — 巨鲸提醒表情\n/setminbuy <USDT> — 触发提醒的最小买入金额\n/setwhale <USDT> — 巨鲸提醒阈值\n/setlanguage <en|es|zh> — 群组语言\n/settings — 查看当前设置\n\n/about — 关于本机器人",
   "token": {
     "added": "✅ 已开始在本群追踪 {address} 的买入。",
-    "exists": "ℹ️ {address} 已在追踪中。",
-    "removed": "🗑️ 已停止追踪 {address}。",
+    "exists": "ℹ️ {address} 已在本群追踪中。",
+    "removed": "🗑️ {address} 已停止追踪。",
     "not_found": "⚠️ 本群未在追踪 {address}。",
-    "list_empty": "尚未追踪任何代币。管理员可使用 /addtoken <address> 添加。",
+    "list_empty": "尚未追踪任何代币。管理员可使用 /setup 或 /addtoken <address> 添加。",
     "list_header": "📋 已追踪的代币（{count}）："
   },
   "settings": {
     "updated": "✅ 设置已更新。",
-    "show": "⚙️ 群组设置：\n语言：{language}\n买入表情：{buy_emoji}\n巨鲸表情：{whale_emoji}\n最小买入：{min_buy_usdt} USDT\n巨鲸阈值：{whale_usdt} USDT\n表情步进：{emoji_step_usdt} USDT"
+    "show": "⚙️ 群组设置\n• 语言：{language}\n• 买入表情：{buy_emoji}\n• 巨鲸表情：{whale_emoji}\n• 最小买入：{min_buy_usdt} USDT\n• 巨鲸阈值：{whale_usdt} USDT\n• 表情步长：{emoji_step_usdt} USDT"
   },
   "language": {
     "set": "🌐 群组语言已设置为 {language}。",
     "invalid": "⚠️ 不支持的语言。可选：{languages}"
   },
   "emoji": {
-    "set": "✅ 买入提醒表情已设置为 {emoji}。"
+    "set": "✅ 提醒表情已设置为 {emoji}。"
   },
   "minbuy": {
     "set": "✅ 最小买入提醒金额已设置为 {value} USDT。"
@@ -33,16 +33,18 @@
     "received": "📦 收到",
     "buyer": "👤 买家",
     "price": "💲 价格",
-    "mcap": "🏦 市值",
+    "mcap": "🏦 市值：{mcap_usd} USDT（≈ {mcap_mon} MON）",
+    "mcap_mon": "🏦 市值：{mcap_mon} MON",
+    "new_buyer": "🆕 新买家 —— 首次买入该代币！",
     "incubation": "🧪 孵化进度",
-    "whale": "🐋 巨鲸提醒！"
+    "whale": "🐋 巨鲸提醒 —— 检测到大额买入！"
   },
   "price": {
     "line": "{symbol}：{price_mon} MON（{price_usd}）"
   },
   "error": {
     "invalid_address": "⚠️ 无效地址：{address}",
-    "admin_only": "⛔ 仅群组管理员可使用此命令。",
+    "admin_only": "⛔ 此命令仅限群组管理员使用。",
     "generic": "❌ 出错了，请稍后重试。"
   },
   "incubation": {
@@ -52,20 +54,20 @@
     "not_incubating": "{symbol} 当前不在联合曲线孵化中。"
   },
   "stats": {
-    "title": "📊 本群买入统计（24 小时）",
+    "title": "📊 24 小时买入统计 —— 本群",
     "line": "{symbol}：{count} 笔买入 · {volume_mon} MON（{volume_usd}）"
   },
   "leaderboard": {
-    "title": "🏆 本群买入排行榜",
+    "title": "🏆 买入排行榜 —— 本群",
     "row": "{rank}. {buyer} — {total_mon} MON",
     "empty": "暂无买入记录。"
   },
-  "about": "🤖 Monad 买入提醒机器人\n\n为 Monad（链 ID 143）上的任意代币提供实时买入提醒：支持 DEX 交易与 nad.fun 风格的孵化代币，每个群组可自定义表情、阈值和语言。\n\n浏览器：https://monadvision.com",
+  "about": "🤖 Monad Buy Bot\n\n为 Monad（链 ID 143）上的任意代币提供实时买入/卖出提醒：支持 DEX 交易与联合曲线孵化代币，每个群组可自定义表情、阈值和语言。\n\n专为需要快速、可靠链上信号的交易社区打造。\n\n浏览器：https://monadvision.com",
   "ui": {
-    "settings_title": "⚙️ 设置 — 点击下方按钮修改对应选项：",
+    "settings_title": "⚙️ 群组设置 —— 点击下方选项进行修改：",
     "btn_language": "🌐 语言：{value}",
     "btn_emoji_buy": "🎨 买入表情：{value}",
-    "btn_emoji_whale": "🐋 鲸鱼表情：{value}",
+    "btn_emoji_whale": "🐋 巨鲸表情：{value}",
     "btn_emoji_sell": "🔴 卖出表情：{value}",
     "btn_minbuy_usdt": "💰 最小买入（USDT）：{value}",
     "btn_whale_usdt": "🐳 巨鲸阈值（USDT）：{value}",
@@ -81,16 +83,16 @@
     "btn_help": "📖 帮助",
     "on": "开启",
     "off": "关闭",
-    "choose_language": "🌐 请选择语言：",
+    "choose_language": "🌐 请选择群组语言：",
     "choose_emoji": "🎨 选择一个表情，或点击 ✏️ 自定义发送自己的表情：",
     "choose_amount": "💰 选择一个 USDT 数值，或点击 ✏️ 自定义：",
-    "custom_prompt_emoji": "✏️ 回复此消息，发送你想使用的表情（1–4 个表情字符）。",
+    "custom_prompt_emoji": "✏️ 回复此消息，发送您想使用的表情（1–4 个表情字符，或 Premium 自定义表情）。",
     "custom_prompt_amount": "✏️ 回复此消息，发送 USDT 数值（大于 0 的数字）。",
     "saved": "✅ 已保存。",
     "invalid_emoji": "⚠️ 这看起来不像表情符号。请发送 1–4 个表情字符（不含字母或数字）。",
     "invalid_number": "⚠️ 请发送大于 0 的数字。",
     "token_deleted": "🗑️ 代币已移除。",
-    "no_tokens": "尚未追踪任何代币。管理员可使用 /addtoken <address> 添加。",
+    "no_tokens": "尚未追踪任何代币。管理员可使用 /setup 或 /addtoken <address> 添加。",
     "start_buttons_help": "点击 ⚙️ 设置，用按钮即可配置本群的提醒，无需输入命令。",
     "add_to_group": "➕ 把我添加到你的群组"
   },
@@ -101,13 +103,13 @@
     "kind_dex": "💱 DEX",
     "btn_track": "✅ 开始追踪",
     "btn_cancel": "❌ 取消",
-    "tracked": "✅ 已开始在本群追踪 {name}（${symbol}）。快速配置：",
+    "tracked": "✅ 已开始在本群追踪 {name}（${symbol}）。\n快速配置：",
     "btn_emoji": "🎨 表情",
     "btn_minbuy": "💰 最小买入 USDT",
     "btn_whale": "🐋 巨鲸 USDT",
     "btn_language": "🌐 语言",
     "btn_done": "✔️ 完成",
     "invalid_token": "⚠️ 这看起来不是有效的代币地址。请发送 Monad 地址（0x 开头加 40 位十六进制字符）。",
-    "fetch_failed": "⚠️ 无法从链上获取该代币信息。请检查地址后重试。"
+    "fetch_failed": "⚠️ 无法从链上获取该代币信息。请核对地址后重试。"
   }
 }

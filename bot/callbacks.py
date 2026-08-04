@@ -46,7 +46,7 @@ from telegram.ext import CallbackQueryHandler, ContextTypes, MessageHandler, fil
 
 from core.i18n import SUPPORTED_LANGS, t
 
-from bot import keyboards
+from bot import emojis, keyboards
 
 logger = logging.getLogger(__name__)
 
@@ -227,8 +227,8 @@ async def _wizard_done(query, deps, chat_id: int, lang: str) -> None:
             lang,
             "settings.show",
             language=settings.language,
-            buy_emoji=settings.buy_emoji,
-            whale_emoji=settings.whale_emoji,
+            buy_emoji=emojis.display_emoji(settings.buy_emoji),
+            whale_emoji=emojis.display_emoji(settings.whale_emoji),
             min_buy_usdt=f"{settings.min_buy_usdt:g}",
             whale_usdt=f"{settings.whale_usdt:g}",
             emoji_step_usdt=f"{settings.emoji_step_usdt:g}",
@@ -522,10 +522,16 @@ async def on_guided_text(update: Update, context: ContextTypes.DEFAULT_TYPE, dep
         return
 
     if awaiting in EMOJI_ATTRS:
-        if not _valid_emoji(text):
+        custom = emojis.custom_emoji_from_entities(
+            update.message.text or "", getattr(update.message, "entities", None)
+        )
+        if custom is not None:
+            value = custom
+        elif not _valid_emoji(text):
             await update.message.reply_text(t(lang, "ui.invalid_emoji"))
             return
-        value = text
+        else:
+            value = text
     elif awaiting in AMOUNT_ATTRS:
         try:
             value = float(text)

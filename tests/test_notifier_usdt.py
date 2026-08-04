@@ -126,7 +126,7 @@ async def test_no_feed_shows_mon_only_and_single_emoji(bot):
         bot, 123, settings, make_buy(amount_mon=50.0, amount_usd=None), None
     )
     text = sent_text(bot)
-    assert text.splitlines()[0].startswith("🟢 ")
+    assert text.splitlines()[1] == "🟢"  # single emoji on the line below the title
     spent_line = next(ln for ln in text.splitlines() if "50.00 MON" in ln)
     assert "USDT" not in spent_line
     assert "buy.whale" not in text  # no whale line without a price feed

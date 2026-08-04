@@ -273,6 +273,19 @@ class Database:
                 ),
             )
 
+    def has_bought_before(self, chat_id: int, token_address: str, buyer: str) -> bool:
+        """True if this buyer already bought this token in this group.
+
+        Buyer addresses are stored un-normalized, so compare case-insensitively.
+        """
+        row = self._conn.execute(
+            "SELECT 1 FROM buys"
+            " WHERE chat_id = ? AND token_address = ? AND LOWER(buyer) = LOWER(?)"
+            " LIMIT 1",
+            (chat_id, _norm(token_address), buyer),
+        ).fetchone()
+        return row is not None
+
     def get_stats_24h(self, chat_id: int, token: str | None = None) -> dict:
         """24h aggregates -> {"count": int, "volume_mon": float, "volume_usd": float}."""
         since = int(time.time()) - _SECONDS_24H

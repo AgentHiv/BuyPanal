@@ -20,7 +20,8 @@ from chain import price as chain_price
 from core.db import Database
 from core.i18n import SUPPORTED_LANGS, t
 
-from bot import keyboards
+from bot import emojis, keyboards
+from bot.callbacks import _valid_emoji
 
 logger = logging.getLogger(__name__)
 
@@ -228,10 +229,22 @@ async def cmd_setemoji(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not context.args:
         await _reply_error(update, context)
         return
+    custom = emojis.custom_emoji_from_entities(
+        update.message.text or "", getattr(update.message, "entities", None)
+    )
+    if custom is not None:
+        emoji = custom
+    else:
+        emoji = context.args[0].strip()
+        if not _valid_emoji(emoji):
+            await update.message.reply_text(t(lang, "ui.invalid_emoji"))
+            return
     settings = db.get_settings(chat_id)
-    settings.buy_emoji = context.args[0].strip()
+    settings.buy_emoji = emoji
     db.save_settings(settings)
-    await update.message.reply_text(t(lang, "emoji.set", emoji=settings.buy_emoji))
+    await update.message.reply_text(
+        t(lang, "emoji.set", emoji=emojis.display_emoji(settings.buy_emoji))
+    )
 
 
 @admin_only
@@ -242,10 +255,22 @@ async def cmd_setwhaleemoji(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if not context.args:
         await _reply_error(update, context)
         return
+    custom = emojis.custom_emoji_from_entities(
+        update.message.text or "", getattr(update.message, "entities", None)
+    )
+    if custom is not None:
+        emoji = custom
+    else:
+        emoji = context.args[0].strip()
+        if not _valid_emoji(emoji):
+            await update.message.reply_text(t(lang, "ui.invalid_emoji"))
+            return
     settings = db.get_settings(chat_id)
-    settings.whale_emoji = context.args[0].strip()
+    settings.whale_emoji = emoji
     db.save_settings(settings)
-    await update.message.reply_text(t(lang, "emoji.set", emoji=settings.whale_emoji))
+    await update.message.reply_text(
+        t(lang, "emoji.set", emoji=emojis.display_emoji(settings.whale_emoji))
+    )
 
 
 @admin_only

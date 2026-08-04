@@ -16,6 +16,8 @@ from core.config import Config
 from core.i18n import SUPPORTED_LANGS, t
 from core.models import BuyEvent, GroupSettings
 
+from bot import emojis
+
 
 def buy_alert_keyboard(buy: BuyEvent, config: Config) -> InlineKeyboardMarkup:
     """Build the [Tx][Chart][Buy] inline keyboard for a buy alert."""
@@ -100,19 +102,19 @@ def build_settings_keyboard(settings: GroupSettings, lang: str) -> InlineKeyboar
         ],
         [
             InlineKeyboardButton(
-                t(lang, "ui.btn_emoji_buy", value=settings.buy_emoji),
+                t(lang, "ui.btn_emoji_buy", value=emojis.display_emoji(settings.buy_emoji)),
                 callback_data="cfg:emoji:buy",
             )
         ],
         [
             InlineKeyboardButton(
-                t(lang, "ui.btn_emoji_whale", value=settings.whale_emoji),
+                t(lang, "ui.btn_emoji_whale", value=emojis.display_emoji(settings.whale_emoji)),
                 callback_data="cfg:emoji:whale",
             )
         ],
         [
             InlineKeyboardButton(
-                t(lang, "ui.btn_emoji_sell", value=_setting(settings, "sell_emoji")),
+                t(lang, "ui.btn_emoji_sell", value=emojis.display_emoji(_setting(settings, "sell_emoji"))),
                 callback_data="cfg:emoji:sell",
             )
         ],
